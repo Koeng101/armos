@@ -1,0 +1,34 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "The arm API for ArmOS to interact with a variety of different\nrobotic arms, starting with the AR3. It uses the basic\ninterface of `x,y,z,a,b,c` for control.",
+        "title": "ArmOS arm API",
+        "contact": {},
+        "version": "0.1"
+    },
+    "basePath": "/api/",
+    "paths": {
+        "/ping": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "dev"
+                ],
+                "summary": "A pingable endpoint",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

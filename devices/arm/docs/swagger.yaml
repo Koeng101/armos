@@ -1,0 +1,25 @@
+basePath: /api/
+info:
+  contact: {}
+  description: |-
+    The arm API for ArmOS to interact with a variety of different
+    robotic arms, starting with the AR3. It uses the basic
+    interface of `x,y,z,a,b,c` for control.
+  title: ArmOS arm API
+  version: "0.1"
+paths:
+  /ping:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: A pingable endpoint
+      tags:
+      - dev
+swagger: "2.0"
