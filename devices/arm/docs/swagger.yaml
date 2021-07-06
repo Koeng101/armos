@@ -1,13 +1,106 @@
 basePath: /api/
+definitions:
+  main.Coordinate:
+    properties:
+      a:
+        type: number
+      b:
+        type: number
+      c:
+        type: number
+      x:
+        type: number
+      "y":
+        type: number
+      z:
+        type: number
+    type: object
+  main.Response:
+    properties:
+      backlash:
+        $ref: '#/definitions/main.Coordinate'
+      end:
+        type: integer
+      from:
+        $ref: '#/definitions/main.Coordinate'
+      id:
+        type: integer
+      start:
+        type: integer
+      status:
+        type: string
+      to:
+        $ref: '#/definitions/main.Coordinate'
+    type: object
 info:
   contact: {}
-  description: |-
-    The arm API for ArmOS to interact with a variety of different
-    robotic arms, starting with the AR3. It uses the basic
-    interface of `x,y,z,a,b,c` for control.
+  description: The arm API for ArmOS to interact with a variety of different robotic
+    arms, starting with the AR3. It uses the basic interface of `x,y,z,a,b,c` for
+    control.
   title: ArmOS arm API
   version: "0.1"
 paths:
+  /calibrate:
+    get:
+      description: Calibrates the robot. Should be done occasionally to affirm the
+        robot is where we think it should be.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.Response'
+      summary: Calibrate the arm
+      tags:
+      - robot
+  /home:
+    get:
+      description: Homes the robot. Useful for when cutting power to the robotic arm.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.Response'
+      summary: Home the arm
+      tags:
+      - robot
+  /move:
+    post:
+      consumes:
+      - application/json
+      description: Moves the robot to a certain position.
+      parameters:
+      - description: abcxyz coordinate
+        in: body
+        name: move
+        required: true
+        schema:
+          $ref: '#/definitions/main.Coordinate'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.Response'
+      summary: Move the arm
+      tags:
+      - robot
   /ping:
     get:
       produces:
@@ -22,4 +115,27 @@ paths:
       summary: A pingable endpoint
       tags:
       - dev
+  /status:
+    get:
+      description: Gives the status of a home, calibrate, or move command.
+      parameters:
+      - description: Command ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.Response'
+      summary: Status of a command
+      tags:
+      - robot
 swagger: "2.0"

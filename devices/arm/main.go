@@ -45,14 +45,17 @@ func initializeApp(db *sqlx.DB) App {
 	app.Router.HandleFunc("/swagger.json", app.SwaggerJSON)
 	app.Router.HandleFunc("/docs", app.SwaggerDocs)
 
+	app.Router.HandleFunc("/api/home", app.Home)
+	app.Router.HandleFunc("/api/calibrate", app.Calibrate)
+	app.Router.HandleFunc("/api/move", app.Move)
+	app.Router.HandleFunc("/api/status", app.Status)
+
 	return app
 }
 
 // @title ArmOS arm API
 // @version 0.1
-// @description The arm API for ArmOS to interact with a variety of different
-// @description robotic arms, starting with the AR3. It uses the basic
-// @description interface of `x,y,z,a,b,c` for control.
+// @description The arm API for ArmOS to interact with a variety of different robotic arms, starting with the AR3. It uses the basic interface of `x,y,z,a,b,c` for control.
 // @BasePath /api/
 func main() {
 	var dbUrl string
@@ -81,32 +84,40 @@ func main() {
 
 ******************************************************************************/
 
-//// Coordinate is a struct containing the ABCXYZ coordinates of a given robotic
-//// arm position.
-//type Coordinate struct {
-//	A float64 `json:"a"`
-//	B float64 `json:"b"`
-//	C float64 `json:"c"`
-//	X float64 `json:"x"`
-//	Y float64 `json:"y"`
-//	Z float64 `json:"z"`
-//}
-//
-//// Response is the response given to a status query on the robotic API.
-//type Response struct {
-//	Id     int    `db:"id" json:"id"`
-//	Status string `db:"status" json:"status"`
-//	Start  int    `db:"start" json:"start"`
-//	End    int    `db:"end" json:"end"`
-//
-//	From     Coordinate `json:"from"`
-//	To       Coordinate `json:"to"`
-//	Backlash Coordinate `json:"backlash"`
-//}
+// Coordinate is a struct containing the ABCXYZ coordinates of a given robotic
+// arm position.
+type Coordinate struct {
+	A float64 `json:"a"`
+	B float64 `json:"b"`
+	C float64 `json:"c"`
+	X float64 `json:"x"`
+	Y float64 `json:"y"`
+	Z float64 `json:"z"`
+}
+
+// Response is the response given to a status query on the robotic API.
+type Response struct {
+	Id     int    `db:"id" json:"id"`
+	Status string `db:"status" json:"status"`
+	Start  int    `db:"start" json:"start"`
+	End    int    `db:"end" json:"end"`
+
+	From     Coordinate `json:"from"`
+	To       Coordinate `json:"to"`
+	Backlash Coordinate `json:"backlash"`
+}
 
 /******************************************************************************
 
                                 armos arm routes
+
+ArmOS's robotic arm API has 4 core endpoints: /home, /calibrate, /move, and
+/status.
+
+1. /home homes the robot to where it can be safely turned off.
+2. /calibrate calibrates the robotic arm to its limit switches.
+3. /move moves the robotic arm to a certain abcxyz location.
+4. /status gives the status of a /home, /calibrate, or /move command.
 
 ******************************************************************************/
 
@@ -164,4 +175,56 @@ func (app *App) SwaggerDocs(w http.ResponseWriter, r *http.Request) {
 </body>
 </html>`, doc)
 	_, _ = w.Write([]byte(swaggerDoc))
+}
+
+// Home homes the robot. This is useful for when the robotic arm will be
+// turned off - otherwise, it will collapse under its own weight.
+// @Summary Home the arm
+// @Tags robot
+// @Description Homes the robot. Useful for when cutting power to the robotic arm.
+// @Produce json
+// @Success 200 {object} Response
+// @Failure 400 {object} Response
+// @Router /home [get]
+func (app *App) Home(w http.ResponseWriter, r *http.Request) {
+	_ = json.NewEncoder(w).Encode(Response{})
+}
+
+// Calibrate calibrates the robot to its limit switches.
+// @Summary Calibrate the arm
+// @Tags robot
+// @Description Calibrates the robot. Should be done occasionally to affirm the robot is where we think it should be.
+// @Produce json
+// @Success 200 {object} Response
+// @Failure 400 {object} Response
+// @Router /calibrate [get]
+func (app *App) Calibrate(w http.ResponseWriter, r *http.Request) {
+	_ = json.NewEncoder(w).Encode(Response{})
+}
+
+// Move moves the robot to a certain abcxyz position
+// @Summary Move the arm
+// @Tags robot
+// @Description Moves the robot to a certain position.
+// @Accept json
+// @Produce json
+// @Param move body Coordinate true "abcxyz coordinate"
+// @Success 200 {object} Response
+// @Failure 400 {object} Response
+// @Router /move [post]
+func (app *App) Move(w http.ResponseWriter, r *http.Request) {
+	_ = json.NewEncoder(w).Encode(Response{})
+}
+
+// Status gives the status of a move command.
+// @Summary Status of a command
+// @Tags robot
+// @Description Gives the status of a home, calibrate, or move command.
+// @Produce json
+// @Param id path int true "Command ID"
+// @Success 200 {object} Response
+// @Failure 400 {object} Response
+// @Router /status [get]
+func (app *App) Status(w http.ResponseWriter, r *http.Request) {
+	_ = json.NewEncoder(w).Encode(Response{})
 }

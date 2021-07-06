@@ -24,6 +24,98 @@ var doc = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/calibrate": {
+            "get": {
+                "description": "Calibrates the robot. Should be done occasionally to affirm the robot is where we think it should be.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "robot"
+                ],
+                "summary": "Calibrate the arm",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/main.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/main.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/home": {
+            "get": {
+                "description": "Homes the robot. Useful for when cutting power to the robotic arm.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "robot"
+                ],
+                "summary": "Home the arm",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/main.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/main.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/move": {
+            "post": {
+                "description": "Moves the robot to a certain position.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "robot"
+                ],
+                "summary": "Move the arm",
+                "parameters": [
+                    {
+                        "description": "abcxyz coordinate",
+                        "name": "move",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.Coordinate"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/main.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/main.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/ping": {
             "get": {
                 "produces": [
@@ -43,6 +135,92 @@ var doc = `{
                             }
                         }
                     }
+                }
+            }
+        },
+        "/status": {
+            "get": {
+                "description": "Gives the status of a home, calibrate, or move command.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "robot"
+                ],
+                "summary": "Status of a command",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Command ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/main.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/main.Response"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "main.Coordinate": {
+            "type": "object",
+            "properties": {
+                "a": {
+                    "type": "number"
+                },
+                "b": {
+                    "type": "number"
+                },
+                "c": {
+                    "type": "number"
+                },
+                "x": {
+                    "type": "number"
+                },
+                "y": {
+                    "type": "number"
+                },
+                "z": {
+                    "type": "number"
+                }
+            }
+        },
+        "main.Response": {
+            "type": "object",
+            "properties": {
+                "backlash": {
+                    "$ref": "#/definitions/main.Coordinate"
+                },
+                "end": {
+                    "type": "integer"
+                },
+                "from": {
+                    "$ref": "#/definitions/main.Coordinate"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "start": {
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "to": {
+                    "$ref": "#/definitions/main.Coordinate"
                 }
             }
         }
@@ -65,7 +243,7 @@ var SwaggerInfo = swaggerInfo{
 	BasePath:    "/api/",
 	Schemes:     []string{},
 	Title:       "ArmOS arm API",
-	Description: "The arm API for ArmOS to interact with a variety of different\nrobotic arms, starting with the AR3. It uses the basic\ninterface of `x,y,z,a,b,c` for control.",
+	Description: "The arm API for ArmOS to interact with a variety of different robotic arms, starting with the AR3. It uses the basic interface of `x,y,z,a,b,c` for control.",
 }
 
 type s struct{}
