@@ -83,7 +83,9 @@ func (ar3 *AR3) Echo(str string) error {
 	}
 
 	// See if we had the same bytes returned
-	stringOutput := fmt.Sprintf("%q", buf[n:])
+	// Note: the serial returns with your string with \n\r\n between two double-quotes ("), so we remove these characters
+	stringOutput := fmt.Sprintf("%q", buf[:n])
+	stringOutput = stringOutput[1 : len(stringOutput)-7]
 	if stringOutput != str {
 		return fmt.Errorf("Failed echo to AR3. Expected %s but got %s", str, stringOutput)
 	}
