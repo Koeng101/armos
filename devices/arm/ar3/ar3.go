@@ -138,3 +138,6 @@ func (ar3 *AR3) Echo(str string) error {
 	// If we got the same string back, success
 	return nil
 }
+
+// MoveStepper moves the robot a certain distance.
+func (ar3 *AR3) MoveStepper(j1, j2, j3, j4, j5, j6) error {
