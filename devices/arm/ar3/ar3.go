@@ -35,6 +35,15 @@ not actually guarantee proper connection in real situations.
 
 Instead, we depend on the AR3 Echo command, which runs in the Connect command,
 to validate that the robot has been connected properly over serial.
+
+Compatibility
+
+The code here is only designed to function on linux machines directly connected
+to the AR3 robotic arm. It uses a couple of serial port configuration variables
+specific to linux systems. We use as few packages as possible, with the only
+non-standard package being golang.org/x/sys/unix, which carries unix file
+variables that help us open the serial port.
+
 */
 package ar3
 
@@ -45,21 +54,15 @@ import (
 	"unsafe"
 )
 
-// stepper is a representation of a stepper motor on the robot.
-type stepper struct {
-	currentStep int
-	stepLim     int
-}
-
 // AR3 struct represents an AR3 robotic arm connected to a serial port.
 type AR3 struct {
 	serial *os.File
-	j1     stepper
-	j2     stepper
-	j3     stepper
-	j4     stepper
-	j5     stepper
-	j6     stepper
+	j1     int
+	j2     int
+	j3     int
+	j4     int
+	j5     int
+	j6     int
 }
 
 // The following StepLims are hard-coded in the ARbot.cal file for the stepper
@@ -107,7 +110,7 @@ func Connect(serialConnectionStr string) (AR3, error) {
 	}
 
 	// Instantiate a new AR3 object that holds our serial port. Additionally, set default stepLims, which are hard-coded in the AR3 software
-	newAR3 := AR3{serial: f, j1: stepper{0, j1stepLim}, j2: stepper{0, j2stepLim}, j3: stepper{0, j3stepLim}, j4: stepper{0, j4stepLim}, j5: stepper{0, j5stepLim}, j6: stepper{0, j6stepLim}}
+	newAR3 := AR3{serial: f, j1: j1stepLim, j2: j2stepLim, j3: j3stepLim, j4: j4stepLim, j5: j5stepLim, j6: j6stepLim}
 
 	// Test to see if we can connect to the newAR3
 	err = newAR3.Echo("Test")
@@ -153,8 +156,25 @@ func (ar3 *AR3) Echo(str string) error {
 	return nil
 }
 
-// moveCommandGenerator generates a move command string.
-func moveCommandGenerator(speed, accdur, accspd, dccdur, dccspd, j1, j2, j3, j4, j5, j6, tr int) string {
+// MoveSteppers moves each of the AR3's stepper motors by a certain amount of steps.
+// In addition to the j1,j2,j3,j4,j5,j6 positions, you can also define 5 other
+// variables: ACCdur, ACCspd, DCCdur, and DCCspd (these are named DEC on ARCS
+// but DCC on the arduino controller), which define the acceleration duration
+// and speed of the stepper motors. Good defaults are:
+//  speed: 25 (line 7941 on ARCS)
+//  accdur: 15 (line 7942 on ARCS)
+//  accspd: 10 (line 7943 on ARCS)
+//  dccdur: 20 (line 7944 on ARCS)
+//  dccspd: 5 (line 7945 on ARCS)
+//
+// Tr is also an active variable that can be changed. It is for controlling
+// the AR3 arm on a track, but it would appear that has not been implemented.
+// Unless you know what you're doing, please keep this variable at 0.
+//
+// MoveSteppers does not have ANY checks. Please double check the values getting fed to
+// MoveSteppers or else the robot WILL self destruct.
+func (ar3 *AR3) MoveSteppers(speed, accdur, accspd, dccdur, dccspd, j1, j2, j3, j4, j5, j6, tr int) error {
+	// command string for movement is MJ
 	command := "MJ"
 	// First, compute direction. If the stepper is negative, that means that direction is set to 1.
 	// We are going to compute these as a list, and then append them to a growing string
@@ -175,30 +195,42 @@ func moveCommandGenerator(speed, accdur, accspd, dccdur, dccspd, j1, j2, j3, j4,
 	// These are also derived from the above commandCalc.
 	command = command + fmt.Sprintf("S%dG%dH%dI%dK%d", speed, accspd, accdur, dccdur, dccspd)
 
-	return command
+	// Send command to AR3
+	_, err := ar3.serial.Write([]byte(command))
+	if err != nil {
+		return err
+	}
+
+	// Normally, we would check here for successful completion. However, there IS no way to check for
+	// successful completion implemented in the AR3 code. So we do not check for this.
+	return nil
 }
 
-// MoveSteppers moves each of the AR3's stepper motors by a certain amount of steps.
-// In addition to the j1,j2,j3,j4,j5,j6 positions, you can also define 5 other
-// variables: ACCdur, ACCspd, DCCdur, and DCCspd (these are named DEC on ARCS
-// but DCC on the arduino controller), which define the acceleration duration
-// and speed of the stepper motors. Good defaults are:
-//  speed: 25 (line 7941 on ARCS)
-//  accdur: 15 (line 7942 on ARCS)
-//  accspd: 10 (line 7943 on ARCS)
-//  dccdur: 20 (line 7944 on ARCS)
-//  dccspd: 5 (line 7945 on ARCS)
-//
-// Tr is also an active variable that can be changed. It is for controlling
-// the AR3 arm on a track, but it would appear that has not been implemented.
-// Unless you know what you're doing, please keep this variable at 0.
-//
-// MoveSteppers does not have ANY checks. Please double check the values getting fed to
-// MoveSteppers or else the robot WILL self destruct.
-func (ar3 *AR3) MoveSteppers(speed, accdur, accspd, dccdur, dccspd, j1, j2, j3, j4, j5, j6, tr int) error {
-	command := moveCommandGenerator(speed, accdur, accspd, dccdur, dccspd, j1, j2, j3, j4, j5, j6, tr)
+// Calibrate moves each of the AR3's stepper motors to their respective limit
+// switch. A good default speed for this action is 50 (line 4659 on ARCS). The
+// j1dir - j6dir variables should hold the direction of the motors. As we have
+// learned, these need to be empirically found and saved in a robotic
+// configuration file.
+func (ar3 *AR3) Calibrate(speed int, j1dir, j2dir, j3dir, j4dir, j5dir, j6dir bool) error {
+	// command string for calibration is LL
+	command := "LL"
+	// The calibrate string is assembled with the beginning of an alphabetical character for each axis.
+	// These were derived from line 4493 in the ARCS source file under the variable "commandCalc".
+	alphabetForCommands := []string{"A", "B", "C", "D", "E", "F"}
+	jmotors := []int{ar3.j1, ar3.j2, ar3.j3, ar3.j4, ar3.j5, ar3.j6}
+	for i, direction := range []bool{j1dir, j2dir, j3dir, j4dir, j5dir, j6dir} {
+		// Each direction is set by the boolean and appended into the calibrate string.
+		// The number of steps taken is equivalent to the step limits, which are hardcoded into the AR3 arm.
+		if direction {
+			command = command + fmt.Sprintf("%s%d%d", alphabetForCommands[i], 1, jmotors[i])
+		} else {
+			command = command + fmt.Sprintf("%s%d%d", alphabetForCommands[i], 0, jmotors[i])
+		}
+	}
+	// Finally, we append the speed.
+	command = command + fmt.Sprintf("S%d\n", speed)
 
-	// Send command
+	// Send command to AR3
 	_, err := ar3.serial.Write([]byte(command))
 	if err != nil {
 		return err
