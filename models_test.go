@@ -3,8 +3,8 @@ package armos
 import (
 	"fmt"
 	"github.com/jmoiron/sqlx"
-	_ "github.com/mattn/go-sqlite3"
 	"log"
+	_ "modernc.org/sqlite"
 	"os"
 	"testing"
 )
@@ -14,7 +14,7 @@ var db *sqlx.DB
 func TestMain(m *testing.M) {
 	// Begin SQLite
 	var err error
-	db, err = sqlx.Open("sqlite3", ":memory:")
+	db, err = sqlx.Open("sqlite", ":memory:")
 	if err != nil {
 		log.Fatalf("Failed to open sqlite in memory: %s", err)
 	}
