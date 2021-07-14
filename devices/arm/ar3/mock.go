@@ -12,6 +12,7 @@ type AR3simulate struct {
 	j4 int
 	j5 int
 	j6 int
+	tr int
 }
 
 // ConnectMock connects to a mock AR3simulate interface.
@@ -63,6 +64,6 @@ func (ar3 *AR3simulate) Home(speed int) error {
 }
 
 // CurrentPosition simulates AR3exec.CurrentPosition().
-func (ar3 *AR3simulate) CurrentPosition() (int, int, int, int, int, int) {
-	return ar3.j1, ar3.j2, ar3.j3, ar3.j4, ar3.j5, ar3.j6
+func (ar3 *AR3simulate) CurrentPosition() (int, int, int, int, int, int, int) {
+	return ar3.j1, ar3.j2, ar3.j3, ar3.j4, ar3.j5, ar3.j6, ar3.tr
 }

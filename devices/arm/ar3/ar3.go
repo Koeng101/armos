@@ -47,7 +47,7 @@ import (
 
 // AR3 is the generic interface for interacting with an AR3 robotic arm.
 type AR3 interface {
-	CurrentPosition() (int, int, int, int, int, int, int)
+	CurrentPosition() (int, int, int, int, int, int, int, int)
 	Echo() error
 	Home(speed int) error
 	MoveSteppers(speed, accdur, accspd, dccdur, dccspd, j1, j2, j3, j4, j5, j6, tr int) error
@@ -71,16 +71,18 @@ type AR3exec struct {
 	j4     int
 	j5     int
 	j6     int
+	tr     int
 	j1dir  bool
 	j2dir  bool
 	j3dir  bool
 	j4dir  bool
 	j5dir  bool
 	j6dir  bool
+	trdir  bool
 }
 
 // Connect connects to the AR3 over serial.
-func Connect(serialConnectionStr string, j1dir, j2dir, j3dir, j4dir, j5dir, j6dir bool) (AR3exec, error) {
+func Connect(serialConnectionStr string, j1dir, j2dir, j3dir, j4dir, j5dir, j6dir, trdir bool) (AR3exec, error) {
 	// Set up connection to the serial port
 	f, err := os.OpenFile(serialConnectionStr, unix.O_RDWR|unix.O_NOCTTY|unix.O_NONBLOCK, 0666)
 	if err != nil {
@@ -115,7 +117,7 @@ func Connect(serialConnectionStr string, j1dir, j2dir, j3dir, j4dir, j5dir, j6di
 	}
 
 	// Instantiate a new AR3 object that holds our serial port. Additionally, set default stepLims, which are hard-coded in the AR3 software
-	newAR3 := AR3exec{serial: f, j1: 0, j2: 0, j3: 0, j4: 0, j5: 0, j6: 0, j1dir: j1dir, j2dir: j2dir, j3dir: j3dir, j4dir: j4dir, j5dir: j5dir, j6dir: j6dir}
+	newAR3 := AR3exec{serial: f, j1dir: j1dir, j2dir: j2dir, j3dir: j3dir, j4dir: j4dir, j5dir: j5dir, j6dir: j6dir, trdir: trdir}
 
 	// Test to see if we can connect to the newAR3
 	err = newAR3.Echo()
@@ -211,7 +213,7 @@ func (ar3 *AR3exec) MoveSteppers(speed, accdur, accspd, dccdur, dccspd, j1, j2, 
 	alphabetForCommands := []string{"A", "B", "C", "D", "E", "F", "T"}
 
 	// directions need to be set as well
-	directions := []bool{ar3.j1dir, ar3.j2dir, ar3.j3dir, ar3.j4dir, ar3.j5dir, ar3.j6dir, false}
+	directions := []bool{ar3.j1dir, ar3.j2dir, ar3.j3dir, ar3.j4dir, ar3.j5dir, ar3.j6dir, ar3.trdir}
 	for i, j := range []int{j1, j2, j3, j4, j5, j6, tr} {
 		jdirection = 0
 		if j < 0 {
@@ -252,9 +254,9 @@ func (ar3 *AR3exec) Home(speed int) error {
 	command := "LL"
 	// The home string is assembled with the beginning of an alphabetical character for each axis.
 	// These were derived from line 4493 in the ARCS source file under the variable "commandCalc".
-	alphabetForCommands := []string{"A", "B", "C", "D", "E", "F"}
-	jmotors := []int{ar3.j1, ar3.j2, ar3.j3, ar3.j4, ar3.j5, ar3.j6}
-	for i, direction := range []bool{ar3.j1dir, ar3.j2dir, ar3.j3dir, ar3.j4dir, ar3.j5dir, ar3.j6dir} {
+	alphabetForCommands := []string{"A", "B", "C", "D", "E", "F", "T"}
+	jmotors := []int{ar3.j1, ar3.j2, ar3.j3, ar3.j4, ar3.j5, ar3.j6, ar3.tr}
+	for i, direction := range []bool{ar3.j1dir, ar3.j2dir, ar3.j3dir, ar3.j4dir, ar3.j5dir, ar3.j6dir, ar3.trdir} {
 		// Each direction is set by the boolean and appended into the calibrate string.
 		// The number of steps taken is equivalent to the step limits, which are hardcoded into the AR3 arm.
 		if direction {
@@ -278,6 +280,6 @@ func (ar3 *AR3exec) Home(speed int) error {
 }
 
 // CurrentPosition returns the current position of the AR3 arm.
-func (ar3 *AR3exec) CurrentPosition() (int, int, int, int, int, int) {
-	return ar3.j1, ar3.j2, ar3.j3, ar3.j4, ar3.j5, ar3.j6
+func (ar3 *AR3exec) CurrentPosition() (int, int, int, int, int, int, int) {
+	return ar3.j1, ar3.j2, ar3.j3, ar3.j4, ar3.j5, ar3.j6, ar3.tr
 }

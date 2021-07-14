@@ -1,3 +1,9 @@
+/* Package main is a Golang REST API for interacting with robotic arms.
+
+The armos server sends this API requests for the robot to move or to go to an
+`a,b,c,x,y,z` position. This only supports the AR3 robotic arm right now, but
+we hope to add more in the future.
+*/
 package main
 
 import (
@@ -12,21 +18,6 @@ import (
 	"net/http"
 	"os"
 )
-
-/******************************************************************************
-
-				armos arm API
-
-This file contains the armos robotic arm API. The armos server would send
-either an API request for the robot to home or an API request for the arm to
-move to an `x,y,z,a,b,c` position.
-
-Right now, we only support the AR3 robotic arm, but hopefully will support more
-in the future.
-
-This initial portion initializes the API itself.
-
-******************************************************************************/
 
 // App is a struct containing all information about the currently deployed
 // application, such as the router and database.

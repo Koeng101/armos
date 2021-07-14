@@ -44,7 +44,7 @@ func ExampleAR3simulate_Home() {
 func ExampleAR3simulate_CurrentPosition() {
 	AR3 := ConnectMock()
 	// Current position. By default, the arm is assumed to be homed at 0
-	j1, _, _, _, _, _ := AR3.CurrentPosition()
+	j1, _, _, _, _, _, _ := AR3.CurrentPosition()
 	if j1 == 0 {
 		fmt.Println("At 0")
 	}
