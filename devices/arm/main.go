@@ -24,7 +24,7 @@ import (
 type App struct {
 	DB     *sqlx.DB
 	Router *http.ServeMux
-	Arm    ar3.AR3
+	Arm    *ar3.AR3
 }
 
 // initalizeApp initializes an App for all endpoints to use.
@@ -32,7 +32,7 @@ func initializeApp(db *sqlx.DB, ar3 ar3.AR3) App {
 	var app App
 	app.DB = db
 	app.Router = http.NewServeMux()
-	app.Arm = ar3
+	app.Arm = &ar3
 
 	// Basic routes
 	app.Router.HandleFunc("/api/ping", app.Ping)
@@ -83,7 +83,7 @@ func main() {
 
 // Schema is the SQLite schema definition which backs the armos arm service.
 var Schema string = `
-CREATE TABLE IF NOT EXISTS response(
+CREATE TABLE IF NOT EXISTS command(
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
 	status TEXT NOT NULL DEFAULT 'queued' CHECK(status in ('queued', 'in-progress', 'cancelled', 'complete')),
 	start INTEGER NOT NULL, -- unix time of start
