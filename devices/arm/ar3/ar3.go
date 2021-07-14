@@ -13,27 +13,19 @@ This Golang library takes over for the local robotic control software by
 implementing the functions needed to communicate with the arduino on the AR3 or
 AR2 robot. Specifically, we implement the functions for:
 
+ - CurrentPosition
  - Echo
+ - Home
  - MoveSteppers
- - Calibrate
 
 We do not yet support encoders in the AR3, nor any other commands. All other
 rountines can be reproduced in code and not directly on the robot.
 
 Testing
 
-We do not test any of the code for connecting to the AR3 robot. We do not test
-it because there is no easy way for us to validate that the code is running as
-expected (because in order to do that, we have to connect to an AR3 robotic
-arm).
-
-There would be an option to simulate the code if we first simulated the AR3
-arduino on local development machines and then connected the simulation to a
-simulated serial port (probably using something like socat). However, this does
-not actually guarantee proper connection in real situations.
-
-Instead, we depend on the AR3 Echo command, which runs in the Connect command,
-to validate that the robot has been connected properly over serial.
+Testing can be done with the AR3simulate struct, which satisfies all of the
+interfaces of AR3. For real connection to a robot, use connect to the robot
+using `Connect` instead of `ConnectMock`.
 
 Compatibility
 
@@ -53,15 +45,12 @@ import (
 	"unsafe"
 )
 
-// AR3 struct represents an AR3 robotic arm connected to a serial port.
-type AR3 struct {
-	serial *os.File
-	j1     int
-	j2     int
-	j3     int
-	j4     int
-	j5     int
-	j6     int
+// AR3 is the generic interface for interacting with an AR3 robotic arm.
+type AR3 interface {
+	CurrentPosition() (int, int, int, int, int, int, int)
+	Echo() error
+	Home(speed int) error
+	MoveSteppers(speed, accdur, accspd, dccdur, dccspd, j1, j2, j3, j4, j5, j6, tr int) error
 }
 
 // The following StepLims are hard-coded in the ARbot.cal file for the stepper
@@ -73,12 +62,29 @@ var j4stepLim int = 15200
 var j5stepLim int = 4575
 var j6stepLim int = 6625
 
+// AR3exec struct represents an AR3 robotic arm connected to a serial port.
+type AR3exec struct {
+	serial *os.File
+	j1     int
+	j2     int
+	j3     int
+	j4     int
+	j5     int
+	j6     int
+	j1dir  bool
+	j2dir  bool
+	j3dir  bool
+	j4dir  bool
+	j5dir  bool
+	j6dir  bool
+}
+
 // Connect connects to the AR3 over serial.
-func Connect(serialConnectionStr string) (AR3, error) {
+func Connect(serialConnectionStr string, j1dir, j2dir, j3dir, j4dir, j5dir, j6dir bool) (AR3exec, error) {
 	// Set up connection to the serial port
 	f, err := os.OpenFile(serialConnectionStr, unix.O_RDWR|unix.O_NOCTTY|unix.O_NONBLOCK, 0666)
 	if err != nil {
-		return AR3{}, err
+		return AR3exec{}, err
 	}
 	rate := uint32(unix.B115200) // 115200 is the default Baud rate of the AR3 arm
 	cflagToUse := unix.CREAD | unix.CLOCAL | rate
@@ -105,14 +111,14 @@ func Connect(serialConnectionStr string) (AR3, error) {
 		0,
 	)
 	if errno != 0 {
-		return AR3{}, err
+		return AR3exec{}, err
 	}
 
 	// Instantiate a new AR3 object that holds our serial port. Additionally, set default stepLims, which are hard-coded in the AR3 software
-	newAR3 := AR3{serial: f, j1: j1stepLim, j2: j2stepLim, j3: j3stepLim, j4: j4stepLim, j5: j5stepLim, j6: j6stepLim}
+	newAR3 := AR3exec{serial: f, j1: 0, j2: 0, j3: 0, j4: 0, j5: 0, j6: 0, j1dir: j1dir, j2dir: j2dir, j3dir: j3dir, j4dir: j4dir, j5dir: j5dir, j6dir: j6dir}
 
 	// Test to see if we can connect to the newAR3
-	err = newAR3.Echo("Test")
+	err = newAR3.Echo()
 	if err != nil {
 		return newAR3, err
 	}
@@ -121,10 +127,11 @@ func Connect(serialConnectionStr string) (AR3, error) {
 	return newAR3, nil
 }
 
-// Echo echos back a string sent to the AR3. This uses the "Echo" function on
-// the AR3 arduino. Useful for testing connectivity to the AR3.
-func (ar3 *AR3) Echo(str string) error {
+// Echo tests an echo command on the AR3. Useful for testing connectivity to
+// the AR3.
+func (ar3 *AR3exec) Echo() error {
 	// Send echo to the device
+	str := "Test"
 	stringToSend := fmt.Sprintf("TM%s\n", str)
 	_, err := ar3.serial.Write([]byte(stringToSend))
 	if err != nil {
@@ -172,7 +179,28 @@ func (ar3 *AR3) Echo(str string) error {
 //
 // MoveSteppers does not have ANY checks. Please double check the values getting fed to
 // MoveSteppers or else the robot WILL self destruct.
-func (ar3 *AR3) MoveSteppers(speed, accdur, accspd, dccdur, dccspd, j1, j2, j3, j4, j5, j6, tr int) error {
+func (ar3 *AR3exec) MoveSteppers(speed, accdur, accspd, dccdur, dccspd, j1, j2, j3, j4, j5, j6, tr int) error {
+	// First, check if the move can be made
+	to := []int{j1, j2, j3, j4, j5, j6}
+	from := []int{ar3.j1, ar3.j2, ar3.j3, ar3.j4, ar3.j5, ar3.j6}
+	limits := []int{j1stepLim, j2stepLim, j3stepLim, j4stepLim, j5stepLim, j6stepLim}
+	motor := []string{"J1", "J2", "J3", "J4", "J5", "J6"}
+	var newPositions []int
+	for i := 0; i < 6; i++ {
+		newJ := to[i] + from[i]
+		if newJ < 0 || newJ > limits[i] {
+			return fmt.Errorf("%s out of range. Must be between 0 and %d. Got %d", motor[i], limits[i], newJ)
+		}
+		newPositions = append(newPositions, newJ)
+	}
+	// If all the limits check out, apply them.
+	ar3.j1 = newPositions[0]
+	ar3.j2 = newPositions[1]
+	ar3.j3 = newPositions[2]
+	ar3.j4 = newPositions[3]
+	ar3.j5 = newPositions[4]
+	ar3.j6 = newPositions[5]
+
 	// command string for movement is MJ
 	command := "MJ"
 	// First, compute direction. If the stepper is negative, that means that direction is set to 1.
@@ -181,12 +209,21 @@ func (ar3 *AR3) MoveSteppers(speed, accdur, accspd, dccdur, dccspd, j1, j2, j3, 
 	// The move string is assembled with the beginning of an alphabetical character for each axis.
 	// These were derived from line 4493 in the ARCS source file under the variable "commandCalc".
 	alphabetForCommands := []string{"A", "B", "C", "D", "E", "F", "T"}
+
+	// directions need to be set as well
+	directions := []bool{ar3.j1dir, ar3.j2dir, ar3.j3dir, ar3.j4dir, ar3.j5dir, ar3.j6dir, false}
 	for i, j := range []int{j1, j2, j3, j4, j5, j6, tr} {
 		jdirection = 0
 		if j < 0 {
 			jdirection = 1
 			j = -1 * j
 		}
+
+		// We also have to compensate for the direction coded when initializing the AR3 (as oftentimes, this can be off)
+		if directions[i] {
+			j = -1 * j
+		}
+
 		command = command + fmt.Sprintf("%s%d%d", alphabetForCommands[i], jdirection, j)
 	}
 
@@ -205,19 +242,19 @@ func (ar3 *AR3) MoveSteppers(speed, accdur, accspd, dccdur, dccspd, j1, j2, j3, 
 	return nil
 }
 
-// Calibrate moves each of the AR3's stepper motors to their respective limit
+// Home moves each of the AR3's stepper motors to their respective limit
 // switch. A good default speed for this action is 50 (line 4659 on ARCS). The
 // j1dir - j6dir variables should hold the direction of the motors. As we have
 // learned, these need to be empirically found and saved in a robotic
 // configuration file.
-func (ar3 *AR3) Calibrate(speed int, j1dir, j2dir, j3dir, j4dir, j5dir, j6dir bool) error {
-	// command string for calibration is LL
+func (ar3 *AR3exec) Home(speed int) error {
+	// command string for home is LL
 	command := "LL"
-	// The calibrate string is assembled with the beginning of an alphabetical character for each axis.
+	// The home string is assembled with the beginning of an alphabetical character for each axis.
 	// These were derived from line 4493 in the ARCS source file under the variable "commandCalc".
 	alphabetForCommands := []string{"A", "B", "C", "D", "E", "F"}
 	jmotors := []int{ar3.j1, ar3.j2, ar3.j3, ar3.j4, ar3.j5, ar3.j6}
-	for i, direction := range []bool{j1dir, j2dir, j3dir, j4dir, j5dir, j6dir} {
+	for i, direction := range []bool{ar3.j1dir, ar3.j2dir, ar3.j3dir, ar3.j4dir, ar3.j5dir, ar3.j6dir} {
 		// Each direction is set by the boolean and appended into the calibrate string.
 		// The number of steps taken is equivalent to the step limits, which are hardcoded into the AR3 arm.
 		if direction {
@@ -238,4 +275,9 @@ func (ar3 *AR3) Calibrate(speed int, j1dir, j2dir, j3dir, j4dir, j5dir, j6dir bo
 	// Normally, we would check here for successful completion. However, there IS no way to check for
 	// successful completion implemented in the AR3 code. So we do not check for this.
 	return nil
+}
+
+// CurrentPosition returns the current position of the AR3 arm.
+func (ar3 *AR3exec) CurrentPosition() (int, int, int, int, int, int) {
+	return ar3.j1, ar3.j2, ar3.j3, ar3.j4, ar3.j5, ar3.j6
 }
