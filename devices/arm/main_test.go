@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/jmoiron/sqlx"
+	"github.com/koeng101/armos/devices/arm/ar3"
 	"log"
 	"net/http/httptest"
 	"os"
@@ -21,7 +22,9 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		log.Fatalf("Failed on CreateDatabase with error: %s", err)
 	}
-	app = initializeApp(db)
+	// Initialize ar3 mock arm
+	arm := ar3.ConnectMock()
+	app = initializeApp(db, arm)
 
 	// Run the rest of our code
 	code := m.Run()

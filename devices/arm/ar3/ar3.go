@@ -47,7 +47,7 @@ import (
 
 // AR3 is the generic interface for interacting with an AR3 robotic arm.
 type AR3 interface {
-	CurrentPosition() (int, int, int, int, int, int, int, int)
+	CurrentPosition() (int, int, int, int, int, int, int)
 	Echo() error
 	Home(speed int) error
 	MoveSteppers(speed, accdur, accspd, dccdur, dccspd, j1, j2, j3, j4, j5, j6, tr int) error
@@ -82,11 +82,11 @@ type AR3exec struct {
 }
 
 // Connect connects to the AR3 over serial.
-func Connect(serialConnectionStr string, j1dir, j2dir, j3dir, j4dir, j5dir, j6dir, trdir bool) (AR3exec, error) {
+func Connect(serialConnectionStr string, j1dir, j2dir, j3dir, j4dir, j5dir, j6dir, trdir bool) (*AR3exec, error) {
 	// Set up connection to the serial port
 	f, err := os.OpenFile(serialConnectionStr, unix.O_RDWR|unix.O_NOCTTY|unix.O_NONBLOCK, 0666)
 	if err != nil {
-		return AR3exec{}, err
+		return &AR3exec{}, err
 	}
 	rate := uint32(unix.B115200) // 115200 is the default Baud rate of the AR3 arm
 	cflagToUse := unix.CREAD | unix.CLOCAL | rate
@@ -113,7 +113,7 @@ func Connect(serialConnectionStr string, j1dir, j2dir, j3dir, j4dir, j5dir, j6di
 		0,
 	)
 	if errno != 0 {
-		return AR3exec{}, err
+		return &AR3exec{}, err
 	}
 
 	// Instantiate a new AR3 object that holds our serial port. Additionally, set default stepLims, which are hard-coded in the AR3 software
@@ -122,11 +122,11 @@ func Connect(serialConnectionStr string, j1dir, j2dir, j3dir, j4dir, j5dir, j6di
 	// Test to see if we can connect to the newAR3
 	err = newAR3.Echo()
 	if err != nil {
-		return newAR3, err
+		return &newAR3, err
 	}
 
 	// If we can echo, return newAR3 object
-	return newAR3, nil
+	return &newAR3, nil
 }
 
 // Echo tests an echo command on the AR3. Useful for testing connectivity to

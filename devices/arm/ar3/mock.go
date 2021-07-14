@@ -16,8 +16,8 @@ type AR3simulate struct {
 }
 
 // ConnectMock connects to a mock AR3simulate interface.
-func ConnectMock() AR3simulate {
-	return AR3simulate{}
+func ConnectMock() *AR3simulate {
+	return &AR3simulate{}
 }
 
 // Echo simulates AR3exec.Echo().

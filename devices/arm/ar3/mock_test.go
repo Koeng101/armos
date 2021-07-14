@@ -5,16 +5,18 @@ import (
 )
 
 func ExampleConnectMock() {
-	AR3 := ConnectMock()
-	if AR3.Echo() == nil {
+	var arm AR3
+	arm = ConnectMock()
+	if arm.Echo() == nil {
 		fmt.Println("Connected")
 	}
 	// Output: Connected
 }
 
 func ExampleAR3simulate_Echo() {
-	AR3 := ConnectMock()
-	err := AR3.Echo()
+	var arm AR3
+	arm = ConnectMock()
+	err := arm.Echo()
 	if err == nil {
 		fmt.Print("Connected")
 	}
@@ -22,9 +24,10 @@ func ExampleAR3simulate_Echo() {
 }
 
 func ExampleAR3simulate_MoveSteppers() {
-	AR3 := ConnectMock()
+	var arm AR3
+	arm = ConnectMock()
 	// Move the arm. First 5 numbers are rational defaults, and each motor gets moved 500 steps
-	err := AR3.MoveSteppers(25, 15, 10, 20, 5, 500, 500, 500, 500, 500, 500, 0)
+	err := arm.MoveSteppers(25, 15, 10, 20, 5, 500, 500, 500, 500, 500, 500, 0)
 	if err == nil {
 		fmt.Println("Moved")
 	}
@@ -32,9 +35,10 @@ func ExampleAR3simulate_MoveSteppers() {
 }
 
 func ExampleAR3simulate_Home() {
-	AR3 := ConnectMock()
+	var arm AR3
+	arm = ConnectMock()
 	// Home the arm. 50 is a good default speed.
-	err := AR3.Home(50)
+	err := arm.Home(50)
 	if err == nil {
 		fmt.Println("Homed")
 	}
@@ -42,9 +46,10 @@ func ExampleAR3simulate_Home() {
 }
 
 func ExampleAR3simulate_CurrentPosition() {
-	AR3 := ConnectMock()
+	var arm AR3
+	arm = ConnectMock()
 	// Current position. By default, the arm is assumed to be homed at 0
-	j1, _, _, _, _, _, _ := AR3.CurrentPosition()
+	j1, _, _, _, _, _, _ := arm.CurrentPosition()
 	if j1 == 0 {
 		fmt.Println("At 0")
 	}
