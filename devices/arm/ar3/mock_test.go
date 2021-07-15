@@ -45,7 +45,7 @@ func ExampleAR3simulate_MoveSteppers() {
 func ExampleAR3simulate_Home() {
 	arm := ConnectMock()
 	// Home the arm. 50 is a good default speed.
-	err := arm.Home(50)
+	err := arm.Home(50, true, true, true, true, true, true, true)
 	if err == nil {
 		fmt.Println("Homed")
 	}

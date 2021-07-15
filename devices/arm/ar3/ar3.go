@@ -49,7 +49,7 @@ import (
 type AR3 interface {
 	CurrentPosition() (int, int, int, int, int, int, int)
 	Echo() error
-	Home(speed int) error
+	Home(speed int, j1, j2, j3, j4, j5, j6, tr bool) error
 	MoveSteppers(speed, accdur, accspd, dccdur, dccspd, j1, j2, j3, j4, j5, j6, tr int) error
 }
 
@@ -249,20 +249,26 @@ func (ar3 *AR3exec) MoveSteppers(speed, accdur, accspd, dccdur, dccspd, j1, j2, 
 // j1dir - j6dir variables should hold the direction of the motors. As we have
 // learned, these need to be empirically found and saved in a robotic
 // configuration file.
-func (ar3 *AR3exec) Home(speed int) error {
+func (ar3 *AR3exec) Home(speed int, j1, j2, j3, j4, j5, j6, tr bool) error {
 	// command string for home is LL
 	command := "LL"
 	// The home string is assembled with the beginning of an alphabetical character for each axis.
 	// These were derived from line 4493 in the ARCS source file under the variable "commandCalc".
 	alphabetForCommands := []string{"A", "B", "C", "D", "E", "F", "T"}
 	jmotors := []int{ar3.j1, ar3.j2, ar3.j3, ar3.j4, ar3.j5, ar3.j6, ar3.tr}
+	homeMotor := []bool{j1, j2, j3, j4, j5, j6, tr}
 	for i, direction := range []bool{ar3.j1dir, ar3.j2dir, ar3.j3dir, ar3.j4dir, ar3.j5dir, ar3.j6dir, ar3.trdir} {
-		// Each direction is set by the boolean and appended into the calibrate string.
-		// The number of steps taken is equivalent to the step limits, which are hardcoded into the AR3 arm.
-		if direction {
-			command = command + fmt.Sprintf("%s%d%d", alphabetForCommands[i], 1, jmotors[i])
+		// First, we check if we need to home the motor. If we do not (false), do not home the motor.
+		if homeMotor[i] {
+			// Each direction is set by the boolean and appended into the calibrate string.
+			// The number of steps taken is equivalent to the step limits, which are hardcoded into the AR3 arm.
+			if direction {
+				command = command + fmt.Sprintf("%s%d%d", alphabetForCommands[i], 1, jmotors[i])
+			} else {
+				command = command + fmt.Sprintf("%s%d%d", alphabetForCommands[i], 0, jmotors[i])
+			}
 		} else {
-			command = command + fmt.Sprintf("%s%d%d", alphabetForCommands[i], 0, jmotors[i])
+			command = command + fmt.Sprintf("%s%d%d", alphabetForCommands[i], 0, 0)
 		}
 	}
 	// Finally, we append the speed.

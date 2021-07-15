@@ -53,13 +53,28 @@ func (ar3 *AR3simulate) MoveSteppers(speed, accdur, accspd, dccdur, dccspd, j1, 
 }
 
 // Home simulates AR3exec.Home()
-func (ar3 *AR3simulate) Home(speed int) error {
-	ar3.j1 = 0
-	ar3.j2 = 0
-	ar3.j3 = 0
-	ar3.j4 = 0
-	ar3.j5 = 0
-	ar3.j6 = 0
+func (ar3 *AR3simulate) Home(speed int, j1, j2, j3, j4, j5, j6, tr bool) error {
+	if j1 {
+		ar3.j1 = 0
+	}
+	if j2 {
+		ar3.j2 = 0
+	}
+	if j3 {
+		ar3.j3 = 0
+	}
+	if j4 {
+		ar3.j4 = 0
+	}
+	if j5 {
+		ar3.j5 = 0
+	}
+	if j6 {
+		ar3.j6 = 0
+	}
+	if tr {
+		ar3.tr = 0
+	}
 	return nil
 }
 
