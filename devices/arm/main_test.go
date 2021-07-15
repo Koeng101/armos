@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/jmoiron/sqlx"
+	"database/sql"
 	"github.com/koeng101/armos/devices/arm/ar3"
 	"log"
 	"net/http/httptest"
@@ -14,7 +14,7 @@ var app App
 
 func TestMain(m *testing.M) {
 	// Initialize the local sqlite database
-	db, err := sqlx.Open("sqlite", ":memory:")
+	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		log.Fatalf("Failed to open sqlite database on err: %s", err)
 	}
