@@ -14,7 +14,7 @@ func main() {
 	_ = robot.Safe()
 
 	// Drive for 5 seconds backwards
-	_ = robot.DriveDirect(-57, -57)
+	_ = robot.DrivePwm(-57, -57)
 	time.Sleep(5 * time.Second)
 
 	// Seek dock

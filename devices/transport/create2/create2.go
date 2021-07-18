@@ -116,12 +116,12 @@ func (create2 *Create2exec) SeekDock() error {
 	return nil
 }
 
-func (create2 *Create2exec) DriveDirect(right, left int) error {
+func (create2 *Create2exec) DrivePwm(right, left int) error {
 	// First, check if the values are within tolerable range.
-	if right > 500 || right < -500 {
+	if right > 255 || right < -255 {
 		return fmt.Errorf("Right drive values must be between 500 and -500. Got: %d", right)
 	}
-	if left > 500 || left < -500 {
+	if left > 255 || left < -255 {
 		return fmt.Errorf("Left drive values must be between 500 and -500. Got: %d", left)
 	}
 
@@ -133,7 +133,7 @@ func (create2 *Create2exec) DriveDirect(right, left int) error {
 	_ = binary.PutVarint(leftBuf, int64(left))
 
 	// Append into a command
-	var opcode byte = 145
+	var opcode byte = 146
 	command := []byte{opcode}
 	command = append(command, rightBuf...)
 	command = append(command, leftBuf...)
