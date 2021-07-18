@@ -1,10 +1,11 @@
 package create2
 
 import (
-	"encoding/hex"
+	"encoding/binary"
 	"fmt"
 	"golang.org/x/sys/unix"
 	"os"
+	"time"
 	"unsafe"
 )
 
