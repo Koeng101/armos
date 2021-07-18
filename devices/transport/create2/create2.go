@@ -1,6 +1,7 @@
 package create2
 
 import (
+	"encoding/hex"
 	"fmt"
 	"golang.org/x/sys/unix"
 	"os"
@@ -15,9 +16,9 @@ type Create2 interface {
 	DriveDirect(int, int) error
 }
 
-
 type Create2exec struct {
 	serial *os.File
+	S      *os.File
 }
 
 func Connect(serialConnectionStr string) (*Create2exec, error) {
@@ -54,7 +55,7 @@ func Connect(serialConnectionStr string) (*Create2exec, error) {
 		return &Create2exec{}, err
 	}
 
-	newCreate2 := Create2exec{serial: f}
+	newCreate2 := Create2exec{serial: f, S: f}
 
 	// Start the create2
 	var start byte = 128
@@ -89,6 +90,8 @@ func (create2 *Create2exec) Safe() error {
 	if err != nil {
 		return err
 	}
+	// Requires a sleep before commands are issued
+	time.Sleep(1 * time.Second)
 	return nil
 }
 
@@ -98,6 +101,8 @@ func (create2 *Create2exec) Full() error {
 	if err != nil {
 		return err
 	}
+	// Requires a sleep before commands are issued
+	time.Sleep(1 * time.Second)
 	return nil
 }
 
@@ -113,26 +118,26 @@ func (create2 *Create2exec) SeekDock() error {
 func (create2 *Create2exec) DriveDirect(right, left int) error {
 	// First, check if the values are within tolerable range.
 	if right > 500 || right < -500 {
-		return fmt.Errorf("Right drive values must be between 500 and -500. Got: %s", right)
+		return fmt.Errorf("Right drive values must be between 500 and -500. Got: %d", right)
 	}
 	if left > 500 || left < -500 {
-		return fmt.Errorf("Left drive values must be between 500 and -500. Got: %s", left)
+		return fmt.Errorf("Left drive values must be between 500 and -500. Got: %d", left)
 	}
 
 	//// Convert right and left into bytes
-	//rightBuf := make([]byte, 2)
-	//_ = binary.PutVarint(rightBuf, int64(right))
+	rightBuf := make([]byte, 2)
+	_ = binary.PutVarint(rightBuf, int64(right))
 
-	//leftBuf := make([]byte, 2)
-	//_ = binary.PutVarint(leftBuf, int64(left))
+	leftBuf := make([]byte, 2)
+	_ = binary.PutVarint(leftBuf, int64(left))
 
 	// Append into a command
-	command := []byte{145}
-	command = append(command, []byte{255, 156}...)
-	command = append(command, []byte{255, 156}...)
+	var opcode byte = 145
+	command := []byte{opcode}
+	command = append(command, rightBuf...)
+	command = append(command, leftBuf...)
 
 	// Send to the robot
-	fmt.Println(command)
 	_, err := create2.serial.Write(command)
 	if err != nil {
 		return err
