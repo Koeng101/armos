@@ -1,8 +1,10 @@
 package main
 
 import (
-	"github.com/koeng101/armos/devices/transport/create2"
+	"fmt"
 	"time"
+
+	"github.com/koeng101/armos/devices/transport/create2"
 )
 
 func main() {
@@ -13,7 +15,10 @@ func main() {
 	_ = robot.Safe()
 
 	// Drive for 5 seconds backwards
-	_ = robot.DriveDirect(-100, -100)
+	err := robot.DriveDirect(100, 100)
+	if err != nil {
+		fmt.Println("%s", err)
+	}
 	time.Sleep(5 * time.Second)
 
 	// Seek dock

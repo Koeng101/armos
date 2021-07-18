@@ -1,7 +1,6 @@
 package create2
 
 import (
-	"encoding/binary"
 	"fmt"
 	"golang.org/x/sys/unix"
 	"os"
@@ -15,6 +14,7 @@ type Create2 interface {
 	SeekDock() error
 	DriveDirect(int, int) error
 }
+
 
 type Create2exec struct {
 	serial *os.File
@@ -115,27 +115,27 @@ func (create2 *Create2exec) DriveDirect(right, left int) error {
 	if right > 500 || right < -500 {
 		return fmt.Errorf("Right drive values must be between 500 and -500. Got: %s", right)
 	}
-	if left > 500 || right < -500 {
+	if left > 500 || left < -500 {
 		return fmt.Errorf("Left drive values must be between 500 and -500. Got: %s", left)
 	}
 
-	// Convert right and left into bytes
-	rightBuf := make([]byte, 2)
-	_ = binary.PutVarint(rightBuf, int64(right))
+	//// Convert right and left into bytes
+	//rightBuf := make([]byte, 2)
+	//_ = binary.PutVarint(rightBuf, int64(right))
 
-	leftBuf := make([]byte, 2)
-	_ = binary.PutVarint(leftBuf, int64(left))
+	//leftBuf := make([]byte, 2)
+	//_ = binary.PutVarint(leftBuf, int64(left))
 
 	// Append into a command
 	command := []byte{145}
-	command = append(command, rightBuf...)
-	command = append(command, leftBuf...)
+	command = append(command, []byte{255, 156}...)
+	command = append(command, []byte{255, 156}...)
 
 	// Send to the robot
+	fmt.Println(command)
 	_, err := create2.serial.Write(command)
 	if err != nil {
 		return err
 	}
 	return nil
-
 }
