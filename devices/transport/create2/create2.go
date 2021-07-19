@@ -1,3 +1,14 @@
+/*
+Package create2 is a Golang library implementing serial commands for the iRobot
+Create2 robot.
+
+Basics
+
+The iRobot Create2 is a low cost mobile robot based on the Roomba 600 series
+robot repurposed for education and hacking. iRobot provides a well documented
+serial interface for controlling the Create2.
+
+*/
 package create2
 
 import (
