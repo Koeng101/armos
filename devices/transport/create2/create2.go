@@ -25,7 +25,8 @@ type Create2 interface {
 	Safe() error
 	Full() error
 	SeekDock() error
-	DriveDirect(int, int) error
+	DrivePwn(int, int) error
+	GetSensorData() (SensorData, error)
 }
 
 type Create2exec struct {
