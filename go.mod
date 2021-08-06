@@ -7,5 +7,6 @@ require (
 	github.com/jmoiron/sqlx v1.3.4
 	github.com/swaggo/swag v1.7.0
 	golang.org/x/sys v0.0.0-20210630005230-0f9fa26af87c
+	gonum.org/v1/gonum v0.9.3
 	modernc.org/sqlite v1.11.2
 )
