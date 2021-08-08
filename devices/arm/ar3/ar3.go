@@ -231,7 +231,7 @@ func (ar3 *AR3exec) MoveSteppers(speed, accdur, accspd, dccdur, dccspd, j1, j2, 
 
 	// We now have the axis commands, so we need to add the speed, accspd, accdur, dccdur, and dccspd.
 	// These are also derived from the above commandCalc.
-	command = command + fmt.Sprintf("S%dG%dH%dI%dK%d", speed, accspd, accdur, dccdur, dccspd)
+	command = command + fmt.Sprintf("S%dG%dH%dI%dK%d\n", speed, accspd, accdur, dccdur, dccspd)
 
 	// Send command to AR3
 	_, err := ar3.serial.Write([]byte(command))
