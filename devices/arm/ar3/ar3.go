@@ -231,7 +231,7 @@ func (ar3 *AR3exec) MoveSteppers(speed, accdur, accspd, dccdur, dccspd, j1, j2, 
 
 	// We now have the axis commands, so we need to add the speed, accspd, accdur, dccdur, and dccspd.
 	// These are also derived from the above commandCalc.
-	command = command + fmt.Sprintf("S%dG%dH%dI%dK%d\n", speed, accspd, accdur, dccdur, dccspd)
+	command = command + fmt.Sprintf("S%dG%dH%dI%dK%d", speed, accspd, accdur, dccdur, dccspd)
 
 	// Send command to AR3
 	_, err := ar3.serial.Write([]byte(command))
@@ -245,10 +245,8 @@ func (ar3 *AR3exec) MoveSteppers(speed, accdur, accspd, dccdur, dccspd, j1, j2, 
 }
 
 // Home moves each of the AR3's stepper motors to their respective limit
-// switch. A good default speed for this action is 50 (line 4659 on ARCS). The
-// j1dir - j6dir variables should hold the direction of the motors. As we have
-// learned, these need to be empirically found and saved in a robotic
-// configuration file.
+// switch. A good default speed for this action is 50 (line 4659 on ARCS). Set
+// the j1 -> j6 booleans "true" if that joint should be homed.
 func (ar3 *AR3exec) Home(speed int, j1, j2, j3, j4, j5, j6, tr bool) error {
 	// command string for home is LL
 	command := "LL"
