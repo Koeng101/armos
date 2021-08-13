@@ -6,13 +6,20 @@ import (
 
 // AR3simulate struct represents an AR3 robotic arm interface for testing purposes.
 type AR3simulate struct {
-	j1 int
-	j2 int
-	j3 int
-	j4 int
-	j5 int
-	j6 int
-	tr int
+	j1    int
+	j2    int
+	j3    int
+	j4    int
+	j5    int
+	j6    int
+	tr    int
+	j1dir bool
+	j2dir bool
+	j3dir bool
+	j4dir bool
+	j5dir bool
+	j6dir bool
+	trdir bool
 }
 
 // ConnectMock connects to a mock AR3simulate interface.
@@ -52,8 +59,8 @@ func (ar3 *AR3simulate) MoveSteppers(speed, accdur, accspd, dccdur, dccspd, j1, 
 	return nil
 }
 
-// Home simulates AR3exec.Home()
-func (ar3 *AR3simulate) Home(speed int, j1, j2, j3, j4, j5, j6, tr bool) error {
+// Calibrate simulates AR3exec.Calibrate()
+func (ar3 *AR3simulate) Calibrate(speed int, j1, j2, j3, j4, j5, j6, tr bool) error {
 	if j1 {
 		ar3.j1 = 0
 	}
@@ -81,4 +88,20 @@ func (ar3 *AR3simulate) Home(speed int, j1, j2, j3, j4, j5, j6, tr bool) error {
 // CurrentPosition simulates AR3exec.CurrentPosition().
 func (ar3 *AR3simulate) CurrentPosition() (int, int, int, int, int, int, int) {
 	return ar3.j1, ar3.j2, ar3.j3, ar3.j4, ar3.j5, ar3.j6, ar3.tr
+}
+
+// SetDirections simulates AR3exec.SetDirections().
+func (ar3 *AR3simulate) SetDirections(j1dir, j2dir, j3dir, j4dir, j5dir, j6dir, trdir bool) {
+	ar3.j1dir = j1dir
+	ar3.j2dir = j2dir
+	ar3.j3dir = j3dir
+	ar3.j4dir = j4dir
+	ar3.j5dir = j5dir
+	ar3.j6dir = j6dir
+	ar3.trdir = trdir
+}
+
+// GetDirections simulates AR3exec.GetDirections().
+func (ar3 *AR3simulate) GetDirections() (bool, bool, bool, bool, bool, bool, bool) {
+	return ar3.j1dir, ar3.j2dir, ar3.j3dir, ar3.j4dir, ar3.j5dir, ar3.j6dir, ar3.trdir
 }

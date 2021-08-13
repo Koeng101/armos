@@ -1,36 +1,67 @@
 basePath: /api/
 definitions:
-  main.Coordinate:
+  main.CalibrateInput:
     properties:
-      a:
-        type: number
-      b:
-        type: number
-      c:
-        type: number
-      x:
-        type: number
-      "y":
-        type: number
-      z:
-        type: number
+      j1:
+        type: boolean
+      j2:
+        type: boolean
+      j3:
+        type: boolean
+      j4:
+        type: boolean
+      j5:
+        type: boolean
+      j6:
+        type: boolean
+      speed:
+        type: integer
+      tr:
+        type: boolean
     type: object
-  main.Response:
+  main.JointDirections:
     properties:
-      backlash:
-        $ref: '#/definitions/main.Coordinate'
-      end:
+      j1:
+        type: boolean
+      j2:
+        type: boolean
+      j3:
+        type: boolean
+      j4:
+        type: boolean
+      j5:
+        type: boolean
+      j6:
+        type: boolean
+      tr:
+        type: boolean
+    type: object
+  main.MoveStepperInput:
+    properties:
+      accdur:
         type: integer
-      from:
-        $ref: '#/definitions/main.Coordinate'
-      id:
+      accspd:
         type: integer
-      start:
+      dccdur:
         type: integer
-      status:
-        type: string
-      to:
-        $ref: '#/definitions/main.Coordinate'
+      dccspd:
+        type: integer
+      j1:
+        type: integer
+      j2:
+        type: integer
+      j3:
+        type: integer
+      j4:
+        type: integer
+      j5:
+        type: integer
+      j6:
+        type: integer
+      speed:
+        type: integer
+      tr:
+        type: integer
     type: object
 info:
   contact: {}
@@ -41,101 +72,112 @@ info:
   version: "0.1"
 paths:
   /calibrate:
-    get:
+    post:
+      consumes:
+      - application/json
       description: Calibrates the robot. Should be done occasionally to affirm the
         robot is where we think it should be.
+      parameters:
+      - description: joints to calibrate
+        in: body
+        name: joints
+        required: true
+        schema:
+          $ref: '#/definitions/main.CalibrateInput'
       produces:
-      - application/json
+      - text/plain
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/main.Response'
+            type: string
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/main.Response'
+            type: string
       summary: Calibrate the arm
       tags:
-      - robot
-  /home:
+      - low_level
+  /directions:
     get:
-      description: Homes the robot. Useful for when cutting power to the robotic arm.
+      description: Returns current direction of arm's motors.
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/main.Response'
+            $ref: '#/definitions/main.JointDirections'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/main.Response'
-      summary: Home the arm
+            type: string
+      summary: Returns direction of arm joints
       tags:
-      - robot
+      - setup
   /move:
     post:
       consumes:
       - application/json
-      description: Moves the robot to a certain position.
+      description: Moves the robot's stepper motors.
       parameters:
-      - description: abcxyz coordinate
+      - description: steppers coordinates
         in: body
         name: move
         required: true
         schema:
-          $ref: '#/definitions/main.Coordinate'
+          $ref: '#/definitions/main.MoveStepperInput'
       produces:
-      - application/json
+      - text/plain
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/main.Response'
+            type: string
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/main.Response'
-      summary: Move the arm
+            type: string
+      summary: Move the arm's stepper motors
       tags:
-      - robot
+      - low_level
   /ping:
     get:
       produces:
-      - application/json
+      - text/plain
       responses:
         "200":
           description: OK
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            type: string
       summary: A pingable endpoint
       tags:
       - dev
-  /status:
-    get:
-      description: Gives the status of a home, calibrate, or move command.
-      parameters:
-      - description: Command ID
-        in: path
-        name: id
-        required: true
-        type: integer
-      produces:
+  /set_directions:
+    post:
+      consumes:
       - application/json
+      description: Sets up the robots joints. This only has to be done once during
+        the setup of the robot.
+      parameters:
+      - description: direction of joints
+        in: body
+        name: directions
+        required: true
+        schema:
+          $ref: '#/definitions/main.JointDirections'
+      produces:
+      - text/plain
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/main.Response'
+            type: string
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/main.Response'
-      summary: Status of a command
+            type: string
+      summary: Sets direction of arm joints
       tags:
-      - robot
+      - setup
 swagger: "2.0"

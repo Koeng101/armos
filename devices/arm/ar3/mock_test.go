@@ -42,14 +42,14 @@ func ExampleAR3simulate_MoveSteppers() {
 	// Output: Moved
 }
 
-func ExampleAR3simulate_Home() {
+func ExampleAR3simulate_Calibrate() {
 	arm := ConnectMock()
-	// Home the arm. 50 is a good default speed.
-	err := arm.Home(50, true, true, true, true, true, true, true)
+	// Calibrate the arm. 50 is a good default speed.
+	err := arm.Calibrate(50, true, true, true, true, true, true, true)
 	if err == nil {
-		fmt.Println("Homed")
+		fmt.Println("Calibrated")
 	}
-	// Output: Homed
+	// Output: Calibrated
 }
 
 func ExampleAR3simulate_CurrentPosition() {

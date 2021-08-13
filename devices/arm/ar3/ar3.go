@@ -15,8 +15,9 @@ AR2 robot. Specifically, we implement the functions for:
 
  - CurrentPosition
  - Echo
- - Home
+ - Calibrate
  - MoveSteppers
+ - SetDirections
 
 We do not yet support encoders in the AR3, nor any other commands. All other
 rountines can be reproduced in code and not directly on the robot.
@@ -49,8 +50,10 @@ import (
 type AR3 interface {
 	CurrentPosition() (int, int, int, int, int, int, int)
 	Echo() error
-	Home(speed int, j1, j2, j3, j4, j5, j6, tr bool) error
+	Calibrate(speed int, j1, j2, j3, j4, j5, j6, tr bool) error
 	MoveSteppers(speed, accdur, accspd, dccdur, dccspd, j1, j2, j3, j4, j5, j6, tr int) error
+	SetDirections(bool, bool, bool, bool, bool, bool, bool)
+	GetDirections() (bool, bool, bool, bool, bool, bool, bool)
 }
 
 // The following StepLims are hard-coded in the ARbot.cal file for the stepper
@@ -244,10 +247,10 @@ func (ar3 *AR3exec) MoveSteppers(speed, accdur, accspd, dccdur, dccspd, j1, j2, 
 	return nil
 }
 
-// Home moves each of the AR3's stepper motors to their respective limit
+// Calibrate moves each of the AR3's stepper motors to their respective limit
 // switch. A good default speed for this action is 50 (line 4659 on ARCS). Set
 // the j1 -> j6 booleans "true" if that joint should be homed.
-func (ar3 *AR3exec) Home(speed int, j1, j2, j3, j4, j5, j6, tr bool) error {
+func (ar3 *AR3exec) Calibrate(speed int, j1, j2, j3, j4, j5, j6, tr bool) error {
 	// command string for home is LL
 	command := "LL"
 	// The home string is assembled with the beginning of an alphabetical character for each axis.
@@ -286,4 +289,20 @@ func (ar3 *AR3exec) Home(speed int, j1, j2, j3, j4, j5, j6, tr bool) error {
 // CurrentPosition returns the current position of the AR3 arm.
 func (ar3 *AR3exec) CurrentPosition() (int, int, int, int, int, int, int) {
 	return ar3.j1, ar3.j2, ar3.j3, ar3.j4, ar3.j5, ar3.j6, ar3.tr
+}
+
+// SetDirections sets the directions of the AR3 arm.
+func (ar3 *AR3exec) SetDirections(j1dir, j2dir, j3dir, j4dir, j5dir, j6dir, trdir bool) {
+	ar3.j1dir = j1dir
+	ar3.j2dir = j2dir
+	ar3.j3dir = j3dir
+	ar3.j4dir = j4dir
+	ar3.j5dir = j5dir
+	ar3.j6dir = j6dir
+	ar3.trdir = trdir
+}
+
+// GetDirections gets the directions of the AR3 arm.
+func (ar3 *AR3exec) GetDirections() (bool, bool, bool, bool, bool, bool, bool) {
+	return ar3.j1dir, ar3.j2dir, ar3.j3dir, ar3.j4dir, ar3.j5dir, ar3.j6dir, ar3.trdir
 }
