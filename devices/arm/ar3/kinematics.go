@@ -97,36 +97,44 @@ func ForwardKinematics(thetas StepperTheta, dhParameters DhParameters) XyzXyzw {
 	output.X = accumulatortMat.At(0, 3)
 	output.Y = accumulatortMat.At(1, 3)
 	output.Z = accumulatortMat.At(2, 3)
+	output.Qw, output.Qx, output.Qy, output.Qz = matrixToQuaterian(accumulatortMat)
+	return output
+}
 
+func matrixToQuaterian(accumulatortMat *mat.Dense) (float64, float64, float64, float64) {
 	// http://www.euclideanspace.com/maths/geometry/rotations/conversions/matrixToQuaternion/
+	var qw float64
+	var qx float64
+	var qy float64
+	var qz float64
 	var tr float64
 	var s float64
 	tr = accumulatortMat.At(0, 0) + accumulatortMat.At(1, 1) + accumulatortMat.At(2, 2)
 	switch {
 	case tr > 0:
 		s = math.Sqrt(tr+1.0) * 2
-		output.Qw = 0.25 * s
-		output.Qx = (accumulatortMat.At(2, 1) - accumulatortMat.At(1, 2)) / s
-		output.Qy = (accumulatortMat.At(0, 2) - accumulatortMat.At(2, 0)) / s
-		output.Qz = (accumulatortMat.At(1, 0) - accumulatortMat.At(0, 1)) / s
-	case (accumulatortMat.At(0, 0) > accumulatortMat.At(1, 1)) && (accumulatortMat.At(0, 0) > accumulatortMat.At(2, 2)):
+		qw = 0.25 * s
+		qx = (accumulatortMat.At(2, 1) - accumulatortMat.At(1, 2)) / s
+		qy = (accumulatortMat.At(0, 2) - accumulatortMat.At(2, 0)) / s
+		qz = (accumulatortMat.At(1, 0) - accumulatortMat.At(0, 1)) / s
+	case accumulatortMat.At(0, 0) > accumulatortMat.At(1, 1) && accumulatortMat.At(0, 0) > accumulatortMat.At(2, 2):
 		s = math.Sqrt(1.0+accumulatortMat.At(0, 0)-accumulatortMat.At(1, 1)-accumulatortMat.At(2, 2)) * 2
-		output.Qw = (accumulatortMat.At(2, 1) - accumulatortMat.At(1, 2)) / s
-		output.Qx = 0.25 * s
-		output.Qy = (accumulatortMat.At(0, 1) + accumulatortMat.At(1, 0)) / s
-		output.Qz = (accumulatortMat.At(0, 2) + accumulatortMat.At(2, 0)) / s
+		qw = (accumulatortMat.At(2, 1) - accumulatortMat.At(1, 2)) / s
+		qx = 0.25 * s
+		qy = (accumulatortMat.At(0, 1) + accumulatortMat.At(1, 0)) / s
+		qz = (accumulatortMat.At(0, 2) + accumulatortMat.At(2, 0)) / s
 	case accumulatortMat.At(1, 1) > accumulatortMat.At(2, 2):
 		s = math.Sqrt(1.0+accumulatortMat.At(1, 1)-accumulatortMat.At(0, 0)-accumulatortMat.At(2, 2)) * 2
-		output.Qw = (accumulatortMat.At(0, 2) - accumulatortMat.At(2, 0)) / s
-		output.Qx = (accumulatortMat.At(0, 1) + accumulatortMat.At(1, 0)) / s
-		output.Qy = 0.25 * s
-		output.Qz = (accumulatortMat.At(2, 1) + accumulatortMat.At(1, 2)) / s
+		qw = (accumulatortMat.At(0, 2) - accumulatortMat.At(2, 0)) / s
+		qx = (accumulatortMat.At(0, 1) + accumulatortMat.At(1, 0)) / s
+		qy = 0.25 * s
+		qz = (accumulatortMat.At(2, 1) + accumulatortMat.At(1, 2)) / s
 	default:
 		s = math.Sqrt(1.0+accumulatortMat.At(2, 2)-accumulatortMat.At(0, 0)-accumulatortMat.At(1, 1)) * 2
-		output.Qw = (accumulatortMat.At(0, 1) - accumulatortMat.At(1, 0))
-		output.Qx = (accumulatortMat.At(0, 2) + accumulatortMat.At(2, 0)) / s
-		output.Qy = (accumulatortMat.At(2, 1) + accumulatortMat.At(1, 2)) / s
-		output.Qz = 0.25 * s
+		qw = (accumulatortMat.At(0, 1) - accumulatortMat.At(1, 0))
+		qx = (accumulatortMat.At(0, 2) + accumulatortMat.At(2, 0)) / s
+		qy = (accumulatortMat.At(2, 1) + accumulatortMat.At(1, 2)) / s
+		qz = 0.25 * s
 	}
-	return output
+	return qw, qx, qy, qz
 }
