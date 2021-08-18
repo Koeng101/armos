@@ -5,13 +5,23 @@ import (
 	"math"
 )
 
+// Denavit-Hartenberg Parameters
+type DhParameters struct {
+	ThetaOffsets [6]float64
+	AlphaValues  [6]float64
+	AValues      [6]float64
+	DValues      [6]float64
+}
+
 // Denavit-Hartenberg Parameters of AR3 provided by AR2 Version 2.0 software
 // executable files from https://www.anninrobotics.com/downloads
 // parameters are the same between the AR2 and AR3
-var alphas = [...]float64{-(math.Pi / 2), 0, math.Pi / 2, -(math.Pi / 2), math.Pi / 2, 0}
-var aVals = [...]float64{64.2, 305, 0, 0, 0, 0}
-var dVals = [...]float64{169.77, 0, 0, -222.63, 0, -36.25}
-var thetaOffsets = [...]float64{0, 0, -math.Pi / 2, 0, 0, math.Pi}
+var AR3DhParameters DhParameters = DhParameters{
+	ThetaOffsets: [...]float64{0, 0, -math.Pi / 2, 0, 0, math.Pi},
+	AlphaValues:  [...]float64{-(math.Pi / 2), 0, math.Pi / 2, -(math.Pi / 2), math.Pi / 2, 0},
+	AValues:      [...]float64{64.2, 305, 0, 0, 0, 0},
+	DValues:      [...]float64{169.77, 0, 0, -222.63, 0, -36.25},
+}
 
 type StepperTheta struct {
 	J1 float64
@@ -22,16 +32,17 @@ type StepperTheta struct {
 	J6 float64
 }
 
-type Xyzabc struct {
-	X float64
-	Y float64
-	Z float64
-	A float64
-	B float64
-	C float64
+type XyzXyzw struct {
+	X  float64
+	Y  float64
+	Z  float64
+	Qx float64
+	Qy float64
+	Qz float64
+	Qw float64
 }
 
-func ForwardKinematics(thetas StepperTheta) Xyzabc {
+func ForwardKinematics(thetas StepperTheta, dhParameters DhParameters) XyzXyzw {
 	// First, setup variables. We use 4 variables - theta, alpha, a and d to calculate a matrix
 	// which is then multiplied to an accumulator matrix.
 	thetaArray := []float64{thetas.J1, thetas.J2, thetas.J3, thetas.J4, thetas.J5, thetas.J6}
@@ -49,10 +60,10 @@ func ForwardKinematics(thetas StepperTheta) Xyzabc {
 	// matrix, multiplying it against the accumulator.
 	for jointIdx := 0; jointIdx < 6; jointIdx++ {
 		theta = thetaArray[jointIdx]
-		theta = theta + thetaOffsets[jointIdx]
-		alpha = alphas[jointIdx]
-		a = aVals[jointIdx]
-		d = dVals[jointIdx]
+		theta = theta + dhParameters.ThetaOffsets[jointIdx]
+		alpha = dhParameters.AlphaValues[jointIdx]
+		a = dhParameters.AValues[jointIdx]
+		d = dhParameters.DValues[jointIdx]
 		tMat := mat.NewDense(4, 4, []float64{
 			// First row
 			math.Cos(theta),
@@ -82,12 +93,40 @@ func ForwardKinematics(thetas StepperTheta) Xyzabc {
 	}
 
 	// Now that we have the final accumulatorMatrix, lets figure out the euler angles.
-	var output Xyzabc
+	var output XyzXyzw
 	output.X = accumulatortMat.At(0, 3)
 	output.Y = accumulatortMat.At(1, 3)
 	output.Z = accumulatortMat.At(2, 3)
-	output.A = math.Atan2(math.Sqrt(math.Pow(accumulatortMat.At(0, 2), 2)+math.Pow(accumulatortMat.At(1, 2), 2)), -accumulatortMat.At(2, 2))
-	output.B = math.Atan2(accumulatortMat.At(2, 0)/output.A, accumulatortMat.At(2, 1)/output.A)
-	output.C = math.Atan2(accumulatortMat.At(0, 2)/output.A, accumulatortMat.At(1, 2)/output.A)
+
+	// http://www.euclideanspace.com/maths/geometry/rotations/conversions/matrixToQuaternion/
+	var tr float64
+	var s float64
+	tr = accumulatortMat.At(0, 0) + accumulatortMat.At(1, 1) + accumulatortMat.At(2, 2)
+	switch {
+	case tr > 0:
+		s = math.Sqrt(tr+1.0) * 2
+		output.Qw = 0.25 * s
+		output.Qx = (accumulatortMat.At(2, 1) - accumulatortMat.At(1, 2)) / s
+		output.Qy = (accumulatortMat.At(0, 2) - accumulatortMat.At(2, 0)) / s
+		output.Qz = (accumulatortMat.At(1, 0) - accumulatortMat.At(0, 1)) / s
+	case (accumulatortMat.At(0, 0) > accumulatortMat.At(1, 1)) && (accumulatortMat.At(0, 0) > accumulatortMat.At(2, 2)):
+		s = math.Sqrt(1.0+accumulatortMat.At(0, 0)-accumulatortMat.At(1, 1)-accumulatortMat.At(2, 2)) * 2
+		output.Qw = (accumulatortMat.At(2, 1) - accumulatortMat.At(1, 2)) / s
+		output.Qx = 0.25 * s
+		output.Qy = (accumulatortMat.At(0, 1) + accumulatortMat.At(1, 0)) / s
+		output.Qz = (accumulatortMat.At(0, 2) + accumulatortMat.At(2, 0)) / s
+	case accumulatortMat.At(1, 1) > accumulatortMat.At(2, 2):
+		s = math.Sqrt(1.0+accumulatortMat.At(1, 1)-accumulatortMat.At(0, 0)-accumulatortMat.At(2, 2)) * 2
+		output.Qw = (accumulatortMat.At(0, 2) - accumulatortMat.At(2, 0)) / s
+		output.Qx = (accumulatortMat.At(0, 1) + accumulatortMat.At(1, 0)) / s
+		output.Qy = 0.25 * s
+		output.Qz = (accumulatortMat.At(2, 1) + accumulatortMat.At(1, 2)) / s
+	default:
+		s = math.Sqrt(1.0+accumulatortMat.At(2, 2)-accumulatortMat.At(0, 0)-accumulatortMat.At(1, 1)) * 2
+		output.Qw = (accumulatortMat.At(0, 1) - accumulatortMat.At(1, 0))
+		output.Qx = (accumulatortMat.At(0, 2) + accumulatortMat.At(2, 0)) / s
+		output.Qy = (accumulatortMat.At(2, 1) + accumulatortMat.At(1, 2)) / s
+		output.Qz = 0.25 * s
+	}
 	return output
 }
