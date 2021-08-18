@@ -78,6 +78,7 @@ func decodeFullPacket(data []byte) (SensorData, error) {
 		return SensorData{}, fmt.Errorf("DecodeFullPacket requires a packet of 80 bytes")
 	}
 
+	fmt.Println(data[12:14])
 	// Initialize a raw sensor data struct
 	var s SensorData
 	s.BumpsAndWheelDrops = byteToInt(data[0], false)

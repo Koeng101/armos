@@ -100,12 +100,12 @@ CREATE TABLE IF NOT EXISTS command(
 	toX REAL NOT NULL,
 	toY REAL NOT NULL,
 	toZ REAL NOT NULL,
-	backlashJ1 REAL,
-	backlashJ2 REAL,
-	backlashJ3 REAL,
-	backlashJ4 REAL,
-	backlashJ5 REAL,
-	backlashJ6 REAL
+	backlashA REAL,
+	backlashB REAL,
+	backlashC REAL,
+	backlashX REAL,
+	backlashY REAL,
+	backlashZ REAL
 );
 `
 

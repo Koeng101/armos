@@ -12,7 +12,6 @@ serial interface for controlling the Create2.
 package create2
 
 import (
-	"encoding/binary"
 	"fmt"
 	"golang.org/x/sys/unix"
 	"os"
@@ -137,23 +136,44 @@ func (create2 *Create2exec) DrivePwm(right, left int) error {
 		return fmt.Errorf("Left drive values must be between 500 and -500. Got: %d", left)
 	}
 
-	//// Convert right and left into bytes
-	rightBuf := make([]byte, 2)
-	_ = binary.PutVarint(rightBuf, int64(right))
-
-	leftBuf := make([]byte, 2)
-	_ = binary.PutVarint(leftBuf, int64(left))
-
 	// Append into a command
 	var opcode byte = 146
 	command := []byte{opcode}
-	command = append(command, rightBuf...)
-	command = append(command, leftBuf...)
 
-	// Send to the robot
+	var rightInt16 int16 = int16(right)
+	var rightH, rightL uint8 = uint8(rightInt16>>8), uint8(rightInt16&0xff)
+	command = append(command, rightH)
+	command = append(command, rightL)
+
+	var lefInt16 int16 = int16(left)
+        var leftH, leftL uint8 = uint8(lefInt16>>8), uint8(lefInt16&0xff)
+	command = append(command, leftH)
+	command = append(command, leftL)
+
 	_, err := create2.serial.Write(command)
 	if err != nil {
 		return err
 	}
 	return nil
+}
+
+func (create2 *Create2exec) GetSensors() (SensorData, error) {
+	var command byte = 142
+
+	_, err := create2.serial.Write([]byte{command, 100})
+        if err != nil {
+                return SensorData{}, err
+        }
+	// wait 15ms before update
+	var sensorBytes = make([]byte, 80)
+        time.Sleep(15 * time.Millisecond)
+	_, err = create2.serial.Read(sensorBytes)
+	if err != nil {
+		return SensorData{}, err
+	}
+	sensorData, err := decodeFullPacket(sensorBytes)
+	if err != nil {
+		return sensorData, err
+	}
+	return sensorData, nil
 }
