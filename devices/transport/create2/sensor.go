@@ -73,7 +73,7 @@ func byteToInt(b byte, signed bool) int {
 	return bytesToInt([]byte{b}, signed)
 }
 
-func DecodeFullPacket(data []byte) (SensorData, error) {
+func decodeFullPacket(data []byte) (SensorData, error) {
 	if len(data) != 80 {
 		return SensorData{}, fmt.Errorf("DecodeFullPacket requires a packet of 80 bytes")
 	}
