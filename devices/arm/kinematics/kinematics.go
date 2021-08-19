@@ -145,7 +145,7 @@ func InverseKinematics(thetasInit StepperTheta, desiredEndEffector XyzXyzw, dhPa
 	if err != nil {
 		return StepperTheta{}, err
 	}
-	f = result.Location.F
+	f := result.Location.F
 
 	// If the results aren't up to spec, queue up another theta seed and test again.
 	for i := 0; f > 0.000001; i++ {
