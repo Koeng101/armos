@@ -1,7 +1,8 @@
-package ar3
+package kinematics
 
 import (
 	"gonum.org/v1/gonum/mat"
+	"gonum.org/v1/gonum/optimize"
 	"math"
 )
 
@@ -30,6 +31,10 @@ type StepperTheta struct {
 	J4 float64
 	J5 float64
 	J6 float64
+}
+
+func (st *StepperTheta) toFloat() []float64 {
+	return []float64{st.J1, st.J2, st.J3, st.J4, st.J5, st.J6}
 }
 
 type XyzXyzw struct {
@@ -101,6 +106,51 @@ func ForwardKinematics(thetas StepperTheta, dhParameters DhParameters) XyzXyzw {
 	return output
 }
 
+func InverseKinematics(thetasInit StepperTheta, desiredEndEffector XyzXyzw, dhParameters DhParameters) (StepperTheta, float64, error) {
+	// Initialize an objective function for the optimization problem
+	objectiveFunction := func(s []float64) float64 {
+		stepperThetaTest := StepperTheta{s[0], s[1], s[2], s[3], s[4], s[5]}
+		currentEndEffector := ForwardKinematics(stepperThetaTest, dhParameters)
+
+		// Get XYZ offsets
+		xOffset := desiredEndEffector.X - currentEndEffector.X
+		yOffset := desiredEndEffector.Y - currentEndEffector.Y
+		zOffset := desiredEndEffector.Z - currentEndEffector.Z
+
+		// Get rotational offsets. Essentially, do this in Golang (from python): np.arccos(np.clip(2*(np.dot(target_quat, source_quat)**2) - 1, -1, 1))
+		dotOffset := (desiredEndEffector.Qw * currentEndEffector.Qw) + (desiredEndEffector.Qx * currentEndEffector.Qx) + (desiredEndEffector.Qy * currentEndEffector.Qy) + (desiredEndEffector.Qz * currentEndEffector.Qz)
+		dotOffset = (2*(dotOffset*dotOffset) - 1)
+		if dotOffset > 1 {
+			dotOffset = 1
+		}
+		if dotOffset < -1 {
+			dotOffset = -1
+		}
+		rotationalOffset := math.Acos(dotOffset)
+
+		// Get the error vector
+		errorVector := ((xOffset * xOffset) + (yOffset * yOffset) + (zOffset * zOffset) + (rotationalOffset * rotationalOffset)) * 0.25
+
+		return errorVector
+	}
+
+	// Setup problem and method for solving
+	problem := optimize.Problem{Func: objectiveFunction}
+	//var method optimize.Method
+	//method = &optimize.BFGS{}
+
+	// Solve
+	result, err := optimize.Minimize(problem, thetasInit.toFloat(), nil, nil)
+	if err != nil {
+		return StepperTheta{}, 0, err
+	}
+	r := result.Location.X
+	return StepperTheta{r[0], r[1], r[2], r[3], r[4], r[5]}, result.Location.F, nil
+}
+
+// matrixToQuaterian converts a rotation matrix to a quaterian. This code has
+// been tested in all cases vs the python implementation with scipy rotation
+// and works properly.
 func matrixToQuaterian(accumulatortMat *mat.Dense) (float64, float64, float64, float64) {
 	// http://www.euclideanspace.com/maths/geometry/rotations/conversions/matrixToQuaternion/
 	var qw float64

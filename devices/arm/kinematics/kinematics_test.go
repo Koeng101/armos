@@ -1,13 +1,41 @@
-package ar3
+package kinematics
 
 import (
 	"gonum.org/v1/gonum/mat"
 	"testing"
 )
 
-func TestGetTMats(t *testing.T) {
+func TestForwardKinematics(t *testing.T) {
 	testThetas := StepperTheta{10, 1, 1, 0, 0, 0}
-	_ = ForwardKinematics(testThetas, AR3DhParameters)
+	f := ForwardKinematics(testThetas, AR3DhParameters)
+	switch {
+	case f.X != -101.74590611879692:
+		t.Errorf("Forward kinematics failed on f.X = %f", f.X)
+	case f.Y != -65.96805988175777:
+		t.Errorf("Forward kinematics failed on f.Y = %f", f.Y)
+	case f.Z != -322.27756822304093:
+		t.Errorf("Forward kinematics failed on f.Z = %f", f.Z)
+	case f.Qx != 0.06040824945687102:
+		t.Errorf("Forward kinematics failed on f.Qx = %f", f.Qx)
+	case f.Qy != -0.20421099379003957:
+		t.Errorf("Forward kinematics failed on f.Qy = %f", f.Qy)
+	case f.Qz != 0.2771553334491873:
+		t.Errorf("Forward kinematics failed on f.Qz = %f", f.Qz)
+	case f.Qw != 0.9369277637862541:
+		t.Errorf("Forward kinematics failed on f.Qw = %f", f.Qw)
+	}
+}
+
+func TestInverseKinematics(t *testing.T) {
+	thetasInit := StepperTheta{0, 0, 0, 0, 0, 0}
+	desiredEndEffector := XyzXyzw{-101.74590611879692, -65.96805988175777, -322.27756822304093, 0.06040824945687102, -0.20421099379003957, 0.2771553334491873, 0.9369277637862541}
+	_, f, err := InverseKinematics(thetasInit, desiredEndEffector, AR3DhParameters)
+	if err != nil {
+		t.Errorf("Inverse Kinematics failed with error: %s", err)
+	}
+	if f > 0.000001 {
+		t.Errorf("Inverse kinematics should have a score < 1e-6. Got %f", f)
+	}
 }
 
 func TestMatrixToQuaterian(t *testing.T) {
