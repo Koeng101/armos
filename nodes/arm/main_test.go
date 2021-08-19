@@ -2,7 +2,7 @@ package main
 
 import (
 	"database/sql"
-	"github.com/koeng101/armos/devices/arm/ar3"
+	"github.com/koeng101/armos/devices/ar3"
 	"log"
 	"net/http/httptest"
 	"os"
