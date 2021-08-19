@@ -8,7 +8,8 @@ import (
 	"math/rand"
 )
 
-// Denavit-Hartenberg Parameters
+// DhParameters stand for "Denavit-Hartenberg Parameters". These parameters
+// define a robotic arm for input into forward or reverse kinematics.
 type DhParameters struct {
 	ThetaOffsets [6]float64
 	AlphaValues  [6]float64
@@ -16,16 +17,7 @@ type DhParameters struct {
 	DValues      [6]float64
 }
 
-// Denavit-Hartenberg Parameters of AR3 provided by AR2 Version 2.0 software
-// executable files from https://www.anninrobotics.com/downloads
-// parameters are the same between the AR2 and AR3
-var AR3DhParameters DhParameters = DhParameters{
-	ThetaOffsets: [...]float64{0, 0, -math.Pi / 2, 0, 0, math.Pi},
-	AlphaValues:  [...]float64{-(math.Pi / 2), 0, math.Pi / 2, -(math.Pi / 2), math.Pi / 2, 0},
-	AValues:      [...]float64{64.2, 305, 0, 0, 0, 0},
-	DValues:      [...]float64{169.77, 0, 0, -222.63, 0, -36.25},
-}
-
+// StepperTheta represents angles of the joint stepper motors.
 type StepperTheta struct {
 	J1 float64
 	J2 float64
@@ -39,7 +31,9 @@ func (st *StepperTheta) toFloat() []float64 {
 	return []float64{st.J1, st.J2, st.J3, st.J4, st.J5, st.J6}
 }
 
-type XyzXyzw struct {
+// XyzWxyz represents an Xyz Qw-Qx-Qy-Qz coordinate, where Qw-Qx-Qy-Qz are
+// quaternion coordinates for the rotation of a given end effector.
+type XyzWxyz struct {
 	X  float64
 	Y  float64
 	Z  float64
@@ -49,7 +43,9 @@ type XyzXyzw struct {
 	Qw float64
 }
 
-func ForwardKinematics(thetas StepperTheta, dhParameters DhParameters) XyzXyzw {
+// ForwardKinematics calculates the end effector XyzWxyz coordinates given
+// joint angles and robotic arm parameters.
+func ForwardKinematics(thetas StepperTheta, dhParameters DhParameters) XyzWxyz {
 	// First, setup variables. We use 4 variables - theta, alpha, a and d to calculate a matrix
 	// which is then multiplied to an accumulator matrix.
 	thetaArray := []float64{thetas.J1, thetas.J2, thetas.J3, thetas.J4, thetas.J5, thetas.J6}
@@ -100,7 +96,7 @@ func ForwardKinematics(thetas StepperTheta, dhParameters DhParameters) XyzXyzw {
 	}
 
 	// Now that we have the final accumulatorMatrix, lets figure out the euler angles.
-	var output XyzXyzw
+	var output XyzWxyz
 	output.X = accumulatortMat.At(0, 3)
 	output.Y = accumulatortMat.At(1, 3)
 	output.Z = accumulatortMat.At(2, 3)
@@ -108,7 +104,11 @@ func ForwardKinematics(thetas StepperTheta, dhParameters DhParameters) XyzXyzw {
 	return output
 }
 
-func InverseKinematics(thetasInit StepperTheta, desiredEndEffector XyzXyzw, dhParameters DhParameters) (StepperTheta, error) {
+// InverseKinematics calculates joint angles to achieve an XyzWxyz end effector
+// position given the desired XyzWxyz coordinates and the robotic arm
+// parameters.
+func InverseKinematics(desiredEndEffector XyzWxyz, dhParameters DhParameters) (StepperTheta, error) {
+	thetasInit := StepperTheta{0, 0, 0, 0, 0, 0}
 	// Initialize an objective function for the optimization problem
 	objectiveFunction := func(s []float64) float64 {
 		stepperThetaTest := StepperTheta{s[0], s[1], s[2], s[3], s[4], s[5]}
@@ -125,9 +125,6 @@ func InverseKinematics(thetasInit StepperTheta, desiredEndEffector XyzXyzw, dhPa
 		if dotOffset > 1 {
 			dotOffset = 1
 		}
-		if dotOffset < -1 {
-			dotOffset = -1
-		}
 		rotationalOffset := math.Acos(dotOffset)
 
 		// Get the error vector
@@ -137,8 +134,6 @@ func InverseKinematics(thetasInit StepperTheta, desiredEndEffector XyzXyzw, dhPa
 	}
 	// Setup problem and method for solving
 	problem := optimize.Problem{Func: objectiveFunction}
-	//var method optimize.Method
-	//method = &optimize.BFGS{}
 
 	// Solve
 	result, err := optimize.Minimize(problem, thetasInit.toFloat(), nil, nil)
@@ -148,6 +143,7 @@ func InverseKinematics(thetasInit StepperTheta, desiredEndEffector XyzXyzw, dhPa
 	f := result.Location.F
 
 	// If the results aren't up to spec, queue up another theta seed and test again.
+	// We arbitrarily choose 10e-6 because that is small enough that the errors do not matter.
 	for i := 0; f > 0.000001; i++ {
 		// Get a random seed
 		randTheta := func() float64 {
