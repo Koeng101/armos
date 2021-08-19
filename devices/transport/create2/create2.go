@@ -141,12 +141,12 @@ func (create2 *Create2exec) DrivePwm(right, left int) error {
 	command := []byte{opcode}
 
 	var rightInt16 int16 = int16(right)
-	var rightH, rightL uint8 = uint8(rightInt16>>8), uint8(rightInt16&0xff)
+	var rightH, rightL uint8 = uint8(rightInt16 >> 8), uint8(rightInt16 & 0xff)
 	command = append(command, rightH)
 	command = append(command, rightL)
 
 	var lefInt16 int16 = int16(left)
-        var leftH, leftL uint8 = uint8(lefInt16>>8), uint8(lefInt16&0xff)
+	var leftH, leftL uint8 = uint8(lefInt16 >> 8), uint8(lefInt16 & 0xff)
 	command = append(command, leftH)
 	command = append(command, leftL)
 
@@ -161,12 +161,12 @@ func (create2 *Create2exec) GetSensors() (SensorData, error) {
 	var command byte = 142
 
 	_, err := create2.serial.Write([]byte{command, 100})
-        if err != nil {
-                return SensorData{}, err
-        }
+	if err != nil {
+		return SensorData{}, err
+	}
 	// wait 15ms before update
 	var sensorBytes = make([]byte, 80)
-        time.Sleep(15 * time.Millisecond)
+	time.Sleep(15 * time.Millisecond)
 	_, err = create2.serial.Read(sensorBytes)
 	if err != nil {
 		return SensorData{}, err
