@@ -135,9 +135,6 @@ func InverseKinematics(thetasInit StepperTheta, desiredEndEffector XyzXyzw, dhPa
 
 		return errorVector
 	}
-	var f float64
-	f = 1
-
 	// Setup problem and method for solving
 	problem := optimize.Problem{Func: objectiveFunction}
 	//var method optimize.Method
