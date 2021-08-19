@@ -108,7 +108,7 @@ func ForwardKinematics(thetas StepperTheta, dhParameters DhParameters) XyzXyzw {
 	return output
 }
 
-func InverseKinematics(thetasInit StepperTheta, desiredEndEffector XyzXyzw, dhParameters DhParameters) (StepperTheta, float64, error) {
+func InverseKinematics(thetasInit StepperTheta, desiredEndEffector XyzXyzw, dhParameters DhParameters) (StepperTheta, error) {
 	// Initialize an objective function for the optimization problem
 	objectiveFunction := func(s []float64) float64 {
 		stepperThetaTest := StepperTheta{s[0], s[1], s[2], s[3], s[4], s[5]}
@@ -146,7 +146,7 @@ func InverseKinematics(thetasInit StepperTheta, desiredEndEffector XyzXyzw, dhPa
 	// Solve
 	result, err := optimize.Minimize(problem, thetasInit.toFloat(), nil, nil)
 	if err != nil {
-		return StepperTheta{}, 0, err
+		return StepperTheta{}, err
 	}
 	f = result.Location.F
 
@@ -161,15 +161,15 @@ func InverseKinematics(thetasInit StepperTheta, desiredEndEffector XyzXyzw, dhPa
 		// Solve
 		result, err := optimize.Minimize(problem, randomSeed.toFloat(), nil, nil)
 		if err != nil {
-			return StepperTheta{}, 0, err
+			return StepperTheta{}, err
 		}
 		f = result.Location.F
 		if i == 100 {
-			return StepperTheta{}, 0, errors.New("Failed to iterate 100 times to succes")
+			return StepperTheta{}, errors.New("Failed to iterate 100 times to succes")
 		}
 	}
 	r := result.Location.X
-	return StepperTheta{r[0], r[1], r[2], r[3], r[4], r[5]}, result.Location.F, nil
+	return StepperTheta{r[0], r[1], r[2], r[3], r[4], r[5]}, nil
 }
 
 // matrixToQuaterian converts a rotation matrix to a quaterian. This code has

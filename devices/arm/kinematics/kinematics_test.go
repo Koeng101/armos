@@ -30,12 +30,9 @@ func TestForwardKinematics(t *testing.T) {
 func TestInverseKinematics(t *testing.T) {
 	thetasInit := StepperTheta{0, 0, 0, 0, 0, 0}
 	desiredEndEffector := XyzXyzw{-101.74590611879692, -65.96805988175777, -322.27756822304093, 0.06040824945687102, -0.20421099379003957, 0.2771553334491873, 0.9369277637862541}
-	_, f, err := InverseKinematics(thetasInit, desiredEndEffector, AR3DhParameters)
+	_, err := InverseKinematics(thetasInit, desiredEndEffector, AR3DhParameters)
 	if err != nil {
 		t.Errorf("Inverse Kinematics failed with error: %s", err)
-	}
-	if f > 0.000001 {
-		t.Errorf("Inverse kinematics should have a score < 1e-6. Got %f", f)
 	}
 }
 
@@ -118,7 +115,7 @@ func TestMatrixToQuaterian(t *testing.T) {
 	}
 }
 
-func BenchmarkInverseKinematics100(b *testing.B) {
+func BenchmarkInverseKinematics(b *testing.B) {
 	thetasInit := StepperTheta{0, 0, 0, 0, 0, 0}
 	randTheta := func() float64 {
 		return 360 * rand.Float64()
@@ -126,9 +123,9 @@ func BenchmarkInverseKinematics100(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		randomSeed := StepperTheta{randTheta(), randTheta(), randTheta(), randTheta(), randTheta(), randTheta()}
 		desiredEndEffector := ForwardKinematics(randomSeed, AR3DhParameters)
-		_, f, err := InverseKinematics(thetasInit, desiredEndEffector, AR3DhParameters)
+		_, err := InverseKinematics(thetasInit, desiredEndEffector, AR3DhParameters)
 		if err != nil {
-			b.Errorf("Failed inverse kinematics benchmark with: %s\nSeed: %f-%f-%f-%f-%f-%f\nF score result: %f", err, randomSeed.J1, randomSeed.J2, randomSeed.J3, randomSeed.J4, randomSeed.J5, randomSeed.J6, f)
+			b.Errorf("Failed inverse kinematics benchmark with: %s\nSeed: %f-%f-%f-%f-%f-%f", err, randomSeed.J1, randomSeed.J2, randomSeed.J3, randomSeed.J4, randomSeed.J5, randomSeed.J6)
 		}
 	}
 }
