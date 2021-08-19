@@ -2,6 +2,7 @@ package kinematics
 
 import (
 	"gonum.org/v1/gonum/mat"
+	"math/rand"
 	"testing"
 )
 
@@ -114,5 +115,20 @@ func TestMatrixToQuaterian(t *testing.T) {
 		t.Errorf("Failed mat4 with qy = %f", qy)
 	case qz != 1:
 		t.Errorf("Failed mat4 with qz = %f", qz)
+	}
+}
+
+func BenchmarkInverseKinematics100(b *testing.B) {
+	thetasInit := StepperTheta{0, 0, 0, 0, 0, 0}
+	randTheta := func() float64 {
+		return 360 * rand.Float64()
+	}
+	for i := 0; i < b.N; i++ {
+		randomSeed := StepperTheta{randTheta(), randTheta(), randTheta(), randTheta(), randTheta(), randTheta()}
+		desiredEndEffector := ForwardKinematics(randomSeed, AR3DhParameters)
+		_, f, err := InverseKinematics(thetasInit, desiredEndEffector, AR3DhParameters)
+		if err != nil {
+			b.Errorf("Failed inverse kinematics benchmark with: %s\nSeed: %f-%f-%f-%f-%f-%f\nF score result: %f", err, randomSeed.J1, randomSeed.J2, randomSeed.J3, randomSeed.J4, randomSeed.J5, randomSeed.J6, f)
+		}
 	}
 }

@@ -1,9 +1,11 @@
 package kinematics
 
 import (
+	"errors"
 	"gonum.org/v1/gonum/mat"
 	"gonum.org/v1/gonum/optimize"
 	"math"
+	"math/rand"
 )
 
 // Denavit-Hartenberg Parameters
@@ -133,6 +135,8 @@ func InverseKinematics(thetasInit StepperTheta, desiredEndEffector XyzXyzw, dhPa
 
 		return errorVector
 	}
+	var f float64
+	f = 1
 
 	// Setup problem and method for solving
 	problem := optimize.Problem{Func: objectiveFunction}
@@ -143,6 +147,26 @@ func InverseKinematics(thetasInit StepperTheta, desiredEndEffector XyzXyzw, dhPa
 	result, err := optimize.Minimize(problem, thetasInit.toFloat(), nil, nil)
 	if err != nil {
 		return StepperTheta{}, 0, err
+	}
+	f = result.Location.F
+
+	// If the results aren't up to spec, queue up another theta seed and test again.
+	for i := 0; f > 0.000001; i++ {
+		// Get a random seed
+		randTheta := func() float64 {
+			return 360 * rand.Float64()
+		}
+		randomSeed := StepperTheta{randTheta(), randTheta(), randTheta(), randTheta(), randTheta(), randTheta()}
+
+		// Solve
+		result, err := optimize.Minimize(problem, randomSeed.toFloat(), nil, nil)
+		if err != nil {
+			return StepperTheta{}, 0, err
+		}
+		f = result.Location.F
+		if i == 100 {
+			return StepperTheta{}, 0, errors.New("Failed to iterate 100 times to succes")
+		}
 	}
 	r := result.Location.X
 	return StepperTheta{r[0], r[1], r[2], r[3], r[4], r[5]}, result.Location.F, nil
