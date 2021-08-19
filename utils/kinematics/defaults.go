@@ -6,7 +6,7 @@ import (
 
 // Denavit-Hartenberg Parameters of AR3 provided by AR2 Version 2.0 software
 // executable files from https://www.anninrobotics.com/downloads
-// parameters are the same between the AR2 and AR3
+// Those parameters are the same between the AR2 and AR3.
 var AR3DhParameters DhParameters = DhParameters{
 	ThetaOffsets: [...]float64{0, 0, -math.Pi / 2, 0, 0, math.Pi},
 	AlphaValues:  [...]float64{-(math.Pi / 2), 0, math.Pi / 2, -(math.Pi / 2), math.Pi / 2, 0},

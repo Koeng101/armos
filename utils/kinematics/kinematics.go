@@ -1,3 +1,15 @@
+/*
+Package kinematics calculates forward and inverse kinematics for robotic arm
+systems.
+
+Forward kinematics takes joint angles and returns an XyzWxyz coordinate of the
+end effector. Inverse kinematics takes an XyzWxyz coordinate and returns joint
+angles that move the end effector to that coordinate.
+
+ForwardKinematics (joint angles	-> xyzwxyz)
+
+InverseKinematics (xyzwxyz	-> joint angles)
+*/
 package kinematics
 
 import (
