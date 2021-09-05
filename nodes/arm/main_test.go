@@ -1,10 +1,10 @@
 package main
 
 import (
+	"github.com/koeng101/armos/devices/ar3"
 	"log"
 	"github.com/jmoiron/sqlx"
 	_ "modernc.org/sqlite"
-	"github.com/koeng101/armos/devices/arm/ar3"
 	"net/http/httptest"
 	"os"
 	"strings"

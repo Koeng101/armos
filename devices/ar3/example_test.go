@@ -2,7 +2,7 @@ package ar3_test
 
 import (
 	"fmt"
-	"github.com/koeng101/armos/devices/arm/ar3"
+	"github.com/koeng101/armos/devices/ar3"
 )
 
 // This example shows basic connection to the robot.
