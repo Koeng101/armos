@@ -41,9 +41,11 @@ package ar3
 
 import (
 	"fmt"
-	"golang.org/x/sys/unix"
 	"os"
+	"time"
 	"unsafe"
+
+	"golang.org/x/sys/unix"
 )
 
 // AR3 is the generic interface for interacting with an AR3 robotic arm.
@@ -84,6 +86,23 @@ type AR3exec struct {
 	trdir  bool
 }
 
+// Discards data written to the port but not transmitted,
+// or data received but not read
+func (ar3 *AR3exec) ClearBuffer() error {
+	const TCFLSH = 0x540B
+	_, _, errno := unix.Syscall(
+		unix.SYS_IOCTL,
+		uintptr(ar3.serial.Fd()),
+		uintptr(TCFLSH),
+		uintptr(unix.TCIOFLUSH),
+	)
+
+	if errno == 0 {
+		return nil
+	}
+	return errno
+}
+
 // Connect connects to the AR3 over serial.
 func Connect(serialConnectionStr string, j1dir, j2dir, j3dir, j4dir, j5dir, j6dir, trdir bool) (*AR3exec, error) {
 	// Set up connection to the serial port
@@ -118,9 +137,15 @@ func Connect(serialConnectionStr string, j1dir, j2dir, j3dir, j4dir, j5dir, j6di
 	if errno != 0 {
 		return &AR3exec{}, err
 	}
+	time.Sleep(time.Millisecond * 1000)
 
 	// Instantiate a new AR3 object that holds our serial port. Additionally, set default stepLims, which are hard-coded in the AR3 software
 	newAR3 := AR3exec{serial: f, j1dir: j1dir, j2dir: j2dir, j3dir: j3dir, j4dir: j4dir, j5dir: j5dir, j6dir: j6dir, trdir: trdir}
+
+	err = newAR3.ClearBuffer()
+	if err != nil {
+		return &newAR3, err
+	}
 
 	// Test to see if we can connect to the newAR3
 	err = newAR3.Echo()
@@ -219,6 +244,7 @@ func (ar3 *AR3exec) MoveSteppers(speed, accdur, accspd, dccdur, dccspd, j1, j2, 
 	directions := []bool{ar3.j1dir, ar3.j2dir, ar3.j3dir, ar3.j4dir, ar3.j5dir, ar3.j6dir, ar3.trdir}
 	for i, j := range []int{j1, j2, j3, j4, j5, j6, tr} {
 		jdirection = 0
+
 		if j < 0 {
 			jdirection = 1
 			j = -1 * j
@@ -226,7 +252,14 @@ func (ar3 *AR3exec) MoveSteppers(speed, accdur, accspd, dccdur, dccspd, j1, j2, 
 
 		// We also have to compensate for the direction coded when initializing the AR3 (as oftentimes, this can be off)
 		if directions[i] {
-			j = -1 * j
+			tempDir := 0
+			switch jdirection {
+			case 1:
+				tempDir = 0
+			case 0:
+				tempDir = 1
+			}
+			jdirection = tempDir
 		}
 
 		command = command + fmt.Sprintf("%s%d%d", alphabetForCommands[i], jdirection, j)
@@ -234,10 +267,15 @@ func (ar3 *AR3exec) MoveSteppers(speed, accdur, accspd, dccdur, dccspd, j1, j2, 
 
 	// We now have the axis commands, so we need to add the speed, accspd, accdur, dccdur, and dccspd.
 	// These are also derived from the above commandCalc.
-	command = command + fmt.Sprintf("S%dG%dH%dI%dK%d", speed, accspd, accdur, dccdur, dccspd)
+	command = command + fmt.Sprintf("S%dG%dH%dI%dK%d\n", speed, accspd, accdur, dccdur, dccspd)
 
 	// Send command to AR3
 	_, err := ar3.serial.Write([]byte(command))
+	if err != nil {
+		return err
+	}
+
+	err = ar3.ClearBuffer()
 	if err != nil {
 		return err
 	}
@@ -253,10 +291,11 @@ func (ar3 *AR3exec) MoveSteppers(speed, accdur, accspd, dccdur, dccspd, j1, j2, 
 func (ar3 *AR3exec) Calibrate(speed int, j1, j2, j3, j4, j5, j6, tr bool) error {
 	// command string for home is LL
 	command := "LL"
+
 	// The home string is assembled with the beginning of an alphabetical character for each axis.
 	// These were derived from line 4493 in the ARCS source file under the variable "commandCalc".
 	alphabetForCommands := []string{"A", "B", "C", "D", "E", "F", "T"}
-	jmotors := []int{ar3.j1, ar3.j2, ar3.j3, ar3.j4, ar3.j5, ar3.j6, ar3.tr}
+	jmotors := []int{j1stepLim, j2stepLim, j3stepLim, j4stepLim, j5stepLim, j6stepLim, 0}
 	homeMotor := []bool{j1, j2, j3, j4, j5, j6, tr}
 	for i, direction := range []bool{ar3.j1dir, ar3.j2dir, ar3.j3dir, ar3.j4dir, ar3.j5dir, ar3.j6dir, ar3.trdir} {
 		// First, we check if we need to home the motor. If we do not (false), do not home the motor.
@@ -264,9 +303,9 @@ func (ar3 *AR3exec) Calibrate(speed int, j1, j2, j3, j4, j5, j6, tr bool) error 
 			// Each direction is set by the boolean and appended into the calibrate string.
 			// The number of steps taken is equivalent to the step limits, which are hardcoded into the AR3 arm.
 			if direction {
-				command = command + fmt.Sprintf("%s%d%d", alphabetForCommands[i], 1, jmotors[i])
-			} else {
 				command = command + fmt.Sprintf("%s%d%d", alphabetForCommands[i], 0, jmotors[i])
+			} else {
+				command = command + fmt.Sprintf("%s%d%d", alphabetForCommands[i], 1, jmotors[i])
 			}
 		} else {
 			command = command + fmt.Sprintf("%s%d%d", alphabetForCommands[i], 0, 0)
@@ -277,6 +316,7 @@ func (ar3 *AR3exec) Calibrate(speed int, j1, j2, j3, j4, j5, j6, tr bool) error 
 
 	// Send command to AR3
 	_, err := ar3.serial.Write([]byte(command))
+
 	if err != nil {
 		return err
 	}
