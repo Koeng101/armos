@@ -41,6 +41,7 @@ package ar3
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"time"
 	"unsafe"
@@ -48,12 +49,16 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+// Converts degrees to radians
+var DEG float64 = math.Pi / 180
+
 // AR3 is the generic interface for interacting with an AR3 robotic arm.
 type AR3 interface {
 	CurrentPosition() (int, int, int, int, int, int, int)
 	Echo() error
 	Calibrate(speed int, j1, j2, j3, j4, j5, j6, tr bool) error
-	MoveSteppers(speed, accdur, accspd, dccdur, dccspd, j1, j2, j3, j4, j5, j6, tr int) error
+	MoveSteppers(speed, accdur, accspd, dccdur, dccspd, j1, j2, j3,
+		j4, j5, j6, tr int) error
 	SetDirections(bool, bool, bool, bool, bool, bool, bool)
 	GetDirections() (bool, bool, bool, bool, bool, bool, bool)
 }
@@ -66,6 +71,16 @@ var j3stepLim int = 7850
 var j4stepLim int = 15200
 var j5stepLim int = 4575
 var j6stepLim int = 6625
+
+// The following RadSteps (radians per step) are calculated from the AR3 stepper
+// motors and gearing to be exact values for converting steps to joint angles
+var j1RadStep float64 = 0.045 * DEG
+var j2RadStep float64 = 0.036 * DEG
+var j3RadStep float64 = 0.036 * DEG
+var j4RadStep float64 = 0.04368858655 * DEG
+var j5RadStep float64 = 0.1889390916 * DEG
+var j6RadStep float64 = 0.09373433584 * DEG
+var trMmStep float64 = 0.0 // This is for a linear rail (mm/step)
 
 // AR3exec struct represents an AR3 robotic arm connected to a serial port.
 type AR3exec struct {
@@ -104,7 +119,8 @@ func (ar3 *AR3exec) ClearBuffer() error {
 }
 
 // Connect connects to the AR3 over serial.
-func Connect(serialConnectionStr string, j1dir, j2dir, j3dir, j4dir, j5dir, j6dir, trdir bool) (*AR3exec, error) {
+func Connect(serialConnectionStr string, j1dir, j2dir, j3dir,
+	j4dir, j5dir, j6dir, trdir bool) (*AR3exec, error) {
 	// Set up connection to the serial port
 	f, err := os.OpenFile(serialConnectionStr, unix.O_RDWR|unix.O_NOCTTY|unix.O_NONBLOCK, 0666)
 	if err != nil {
@@ -139,8 +155,10 @@ func Connect(serialConnectionStr string, j1dir, j2dir, j3dir, j4dir, j5dir, j6di
 	}
 	time.Sleep(time.Millisecond * 1000)
 
-	// Instantiate a new AR3 object that holds our serial port. Additionally, set default stepLims, which are hard-coded in the AR3 software
-	newAR3 := AR3exec{serial: f, j1dir: j1dir, j2dir: j2dir, j3dir: j3dir, j4dir: j4dir, j5dir: j5dir, j6dir: j6dir, trdir: trdir}
+	// Instantiate a new AR3 object that holds our serial port. Additionally,
+	// set default stepLims, which are hard-coded in the AR3 software
+	newAR3 := AR3exec{serial: f, j1dir: j1dir, j2dir: j2dir, j3dir: j3dir,
+		j4dir: j4dir, j5dir: j5dir, j6dir: j6dir, trdir: trdir}
 
 	err = newAR3.ClearBuffer()
 	if err != nil {
@@ -192,11 +210,11 @@ func (ar3 *AR3exec) Echo() error {
 	return nil
 }
 
-// MoveSteppers moves each of the AR3's stepper motors by a certain amount of steps.
-// In addition to the j1,j2,j3,j4,j5,j6 positions, you can also define 5 other
-// variables: ACCdur, ACCspd, DCCdur, and DCCspd (these are named DEC on ARCS
-// but DCC on the arduino controller), which define the acceleration duration
-// and speed of the stepper motors. Good defaults are:
+// MoveSteppersRelative moves each of the AR3's stepper motors by a certain
+// amount of steps. In addition to the j1,j2,j3,j4,j5,j6 positions, you can also
+// define 5 other variables: ACCdur, ACCspd, DCCdur, and DCCspd (these are named
+// DEC on ARCS but DCC on the arduino controller), which define the acceleration
+// duration and speed of the stepper motors. Good defaults are:
 //  speed: 25 (line 7941 on ARCS)
 //  accdur: 15 (line 7942 on ARCS)
 //  accspd: 10 (line 7943 on ARCS)
@@ -207,19 +225,22 @@ func (ar3 *AR3exec) Echo() error {
 // the AR3 arm on a track, but it would appear that has not been implemented.
 // Unless you know what you're doing, please keep this variable at 0.
 //
-// MoveSteppers does not have ANY checks. Please double check the values getting fed to
-// MoveSteppers or else the robot WILL self destruct.
-func (ar3 *AR3exec) MoveSteppers(speed, accdur, accspd, dccdur, dccspd, j1, j2, j3, j4, j5, j6, tr int) error {
+// MoveSteppersRelative does not have ANY checks. Please double check the values
+// getting fed to MoveSteppersRelative or else the robot WILL self destruct.
+func (ar3 *AR3exec) MoveSteppersRelative(speed, accdur, accspd, dccdur, dccspd,
+	j1, j2, j3, j4, j5, j6, tr int) error {
 	// First, check if the move can be made
 	to := []int{j1, j2, j3, j4, j5, j6}
 	from := []int{ar3.j1, ar3.j2, ar3.j3, ar3.j4, ar3.j5, ar3.j6}
-	limits := []int{j1stepLim, j2stepLim, j3stepLim, j4stepLim, j5stepLim, j6stepLim}
+	limits := []int{j1stepLim, j2stepLim, j3stepLim,
+		j4stepLim, j5stepLim, j6stepLim}
 	motor := []string{"J1", "J2", "J3", "J4", "J5", "J6"}
 	var newPositions []int
 	for i := 0; i < 6; i++ {
 		newJ := to[i] + from[i]
 		if newJ < 0 || newJ > limits[i] {
-			return fmt.Errorf("%s out of range. Must be between 0 and %d. Got %d", motor[i], limits[i], newJ)
+			return fmt.Errorf("%s out of range. Must be between 0 and %d."+
+				" Got %d", motor[i], limits[i], newJ)
 		}
 		newPositions = append(newPositions, newJ)
 	}
@@ -233,15 +254,18 @@ func (ar3 *AR3exec) MoveSteppers(speed, accdur, accspd, dccdur, dccspd, j1, j2, 
 
 	// command string for movement is MJ
 	command := "MJ"
-	// First, compute direction. If the stepper is negative, that means that direction is set to 1.
-	// We are going to compute these as a list, and then append them to a growing string
+	// First, compute direction. If the stepper is negative, that means that
+	// direction is set to 1. We are going to compute these as a list, and then
+	// append them to a growing string
 	var jdirection int
-	// The move string is assembled with the beginning of an alphabetical character for each axis.
-	// These were derived from line 4493 in the ARCS source file under the variable "commandCalc".
+	// The move string is assembled with the beginning of an alphabetical
+	// character for each axis. These were derived from line 4493 in the ARCS
+	// source file under the variable "commandCalc".
 	alphabetForCommands := []string{"A", "B", "C", "D", "E", "F", "T"}
 
 	// directions need to be set as well
-	directions := []bool{ar3.j1dir, ar3.j2dir, ar3.j3dir, ar3.j4dir, ar3.j5dir, ar3.j6dir, ar3.trdir}
+	directions := []bool{ar3.j1dir, ar3.j2dir, ar3.j3dir, ar3.j4dir,
+		ar3.j5dir, ar3.j6dir, ar3.trdir}
 	for i, j := range []int{j1, j2, j3, j4, j5, j6, tr} {
 		jdirection = 0
 
@@ -250,7 +274,8 @@ func (ar3 *AR3exec) MoveSteppers(speed, accdur, accspd, dccdur, dccspd, j1, j2, 
 			j = -1 * j
 		}
 
-		// We also have to compensate for the direction coded when initializing the AR3 (as oftentimes, this can be off)
+		// We also have to compensate for the direction coded when initializing
+		// the AR3 (as oftentimes, this can be off)
 		if directions[i] {
 			tempDir := 0
 			switch jdirection {
@@ -280,9 +305,48 @@ func (ar3 *AR3exec) MoveSteppers(speed, accdur, accspd, dccdur, dccspd, j1, j2, 
 		return err
 	}
 
-	// Normally, we would check here for successful completion. However, there IS no way to check for
-	// successful completion implemented in the AR3 code. So we do not check for this.
+	// Normally, we would check here for successful completion. However, there
+	// IS no way to check for successful completion implemented in the AR3 code.
+	// So we do not check for this.
 	return nil
+}
+
+// MoveSteppersAbsolute moves each of the AR3's stepper motors to an absolute
+// step position between 0 and the step limit for each joint. See
+// MoveSteppersRelative for full documentation of arguments.
+func (ar3 *AR3exec) MoveSteppersAbsolute(speed, accdur, accspd, dccdur, dccspd,
+	j1, j2, j3, j4, j5, j6, tr int) error {
+	return ar3.MoveSteppersRelative(speed, accdur, accspd, dccdur, dccspd,
+		j1-ar3.j1, j2-ar3.j2, j3-ar3.j3, j4-ar3.j4, j5-ar3.j5, j6-ar3.j6,
+		tr-ar3.tr)
+}
+
+// MoveJointsAbsolute moves each of the AR3's joints to an absolute angle
+// defined relative to the calibration position for each joint. Angles are
+// definied in radians, unless deg is true (in which angles are degrees).
+func (ar3 *AR3exec) MoveJointsAbsolute(speed, accdur, accspd, dccdur,
+	dccspd int, j1, j2, j3, j4, j5, j6, tr float64, deg bool) error {
+
+	var conv float64
+
+	if deg {
+		conv = DEG
+	} else {
+		conv = 1
+	}
+
+	jointSteps := []int{
+		int(math.Round(conv * j1 / j1RadStep)),
+		int(math.Round(conv * j2 / j2RadStep)),
+		int(math.Round(conv * j3 / j3RadStep)),
+		int(math.Round(conv * j5 / j5RadStep)),
+		int(math.Round(conv * j4 / j4RadStep)),
+		int(math.Round(conv * j6 / j6RadStep)),
+		int(math.Round(conv * tr / trMmStep))}
+
+	return ar3.MoveSteppersAbsolute(speed, accdur, accspd, dccdur, dccspd,
+		jointSteps[0], jointSteps[1], jointSteps[2], jointSteps[3],
+		jointSteps[4], jointSteps[5], jointSteps[6])
 }
 
 // Calibrate moves each of the AR3's stepper motors to their respective limit
