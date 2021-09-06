@@ -63,6 +63,14 @@ type AR3 interface {
 	GetDirections() (bool, bool, bool, bool, bool, bool, bool)
 }
 
+// Theta Directions
+// Joint 0: -1
+// Joint 1: 1
+// Joint 2: -1
+// Joint 3: -1
+// Joint 4: 1
+// Joint 5: -1
+
 // The following StepLims are hard-coded in the ARbot.cal file for the stepper
 // motors. These should not change.
 var j1stepLim int = 15200
@@ -74,12 +82,12 @@ var j6stepLim int = 6625
 
 // The following RadSteps (radians per step) are calculated from the AR3 stepper
 // motors and gearing to be exact values for converting steps to joint angles
-var j1RadStep float64 = 0.045 * DEG
-var j2RadStep float64 = 0.036 * DEG
-var j3RadStep float64 = 0.036 * DEG
-var j4RadStep float64 = 0.04368858655 * DEG
-var j5RadStep float64 = 0.1889390916 * DEG
-var j6RadStep float64 = 0.09373433584 * DEG
+var j1RadStep float64 = 0.0225 * DEG
+var j2RadStep float64 = 0.018 * DEG
+var j3RadStep float64 = 0.018 * DEG
+var j4RadStep float64 = 0.01092214664 * DEG
+var j5RadStep float64 = 0.04723477289 * DEG
+var j6RadStep float64 = 0.02343358396 * DEG
 var trMmStep float64 = 0.0 // This is for a linear rail (mm/step)
 
 // AR3exec struct represents an AR3 robotic arm connected to a serial port.
@@ -99,6 +107,17 @@ type AR3exec struct {
 	j5dir  bool
 	j6dir  bool
 	trdir  bool
+}
+
+// Read values off serial into a buffer
+func (ar3 *AR3exec) ReadBuffer() error {
+	// Read output of echo
+	buf := make([]byte, 128)
+	_, err := ar3.serial.Read(buf)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // Discards data written to the port but not transmitted,
@@ -195,7 +214,7 @@ func (ar3 *AR3exec) Echo() error {
 
 	// Double check to make sure the length is > 1
 	if n < 2 {
-		return fmt.Errorf("Return from echo is empty. Is the serial port responding properly?")
+		return fmt.Errorf("return from echo is empty")
 	}
 
 	// See if we had the same bytes returned
@@ -203,7 +222,7 @@ func (ar3 *AR3exec) Echo() error {
 	stringOutput := fmt.Sprintf("%q", buf[:n])
 	stringOutput = stringOutput[1 : len(stringOutput)-7]
 	if stringOutput != str {
-		return fmt.Errorf("Failed echo to AR3. Expected %s but got %s", str, stringOutput)
+		return fmt.Errorf("failed echo to AR3. Expected %s but got %s", str, stringOutput)
 	}
 
 	// If we got the same string back, success
@@ -300,10 +319,13 @@ func (ar3 *AR3exec) MoveSteppersRelative(speed, accdur, accspd, dccdur, dccspd,
 		return err
 	}
 
-	err = ar3.ClearBuffer()
+	err = ar3.ReadBuffer()
 	if err != nil {
 		return err
 	}
+
+	// This has to send and get a response to indicate the move is complete
+	ar3.Echo()
 
 	// Normally, we would check here for successful completion. However, there
 	// IS no way to check for successful completion implemented in the AR3 code.
@@ -339,8 +361,8 @@ func (ar3 *AR3exec) MoveJointsAbsolute(speed, accdur, accspd, dccdur,
 		int(math.Round(conv * j1 / j1RadStep)),
 		int(math.Round(conv * j2 / j2RadStep)),
 		int(math.Round(conv * j3 / j3RadStep)),
-		int(math.Round(conv * j5 / j5RadStep)),
 		int(math.Round(conv * j4 / j4RadStep)),
+		int(math.Round(conv * j5 / j5RadStep)),
 		int(math.Round(conv * j6 / j6RadStep)),
 		int(math.Round(conv * tr / trMmStep))}
 
@@ -385,13 +407,19 @@ func (ar3 *AR3exec) Calibrate(speed int, j1, j2, j3, j4, j5, j6, tr bool) error 
 		return err
 	}
 
+	err = ar3.ReadBuffer()
+	if err != nil {
+		return err
+	}
+
 	// Normally, we would check here for successful completion. However, there IS no way to check for
 	// successful completion implemented in the AR3 code. So we do not check for this.
 	return nil
 }
 
-// CurrentPosition returns the current position of the AR3 arm.
-func (ar3 *AR3exec) CurrentPosition() (int, int, int, int, int, int, int) {
+// CurrentStepperPosition returns the current position of the AR3 arm as stepper
+// motor steps from 0 for each axis.
+func (ar3 *AR3exec) CurrentStepperPosition() (int, int, int, int, int, int, int) {
 	return ar3.j1, ar3.j2, ar3.j3, ar3.j4, ar3.j5, ar3.j6, ar3.tr
 }
 
