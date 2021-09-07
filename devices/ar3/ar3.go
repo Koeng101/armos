@@ -100,13 +100,14 @@ type AR3exec struct {
 	j5     int
 	j6     int
 	tr     int
-	j1dir  bool
-	j2dir  bool
-	j3dir  bool
-	j4dir  bool
-	j5dir  bool
-	j6dir  bool
-	trdir  bool
+
+	j1dir bool
+	j2dir bool
+	j3dir bool
+	j4dir bool
+	j5dir bool
+	j6dir bool
+	trdir bool
 }
 
 // Read values off serial into a buffer
@@ -373,22 +374,34 @@ func (ar3 *AR3exec) MoveJointsAbsolute(speed, accdur, accspd, dccdur,
 
 // Calibrate moves each of the AR3's stepper motors to their respective limit
 // switch. A good default speed for this action is 50 (line 4659 on ARCS). Set
-// the j1 -> j6 booleans "true" if that joint should be homed.
-func (ar3 *AR3exec) Calibrate(speed int, j1, j2, j3, j4, j5, j6, tr bool) error {
+// the j1 -> j6 booleans "true" if that joint should be homed. Set the
+// j1calibdir -> j6calibdir booleans "true" if the calibration direction should
+// be in the negative axis direction.
+func (ar3 *AR3exec) Calibrate(speed int, j1, j2, j3, j4, j5, j6, tr,
+	j1calibdir, j2calibdir, j3calibdir, j4calibdir, j5calibdir, j6calibdir,
+	trcalibdir bool) error {
 	// command string for home is LL
 	command := "LL"
 
-	// The home string is assembled with the beginning of an alphabetical character for each axis.
-	// These were derived from line 4493 in the ARCS source file under the variable "commandCalc".
+	// The home string is assembled with the beginning of an alphabetical
+	// character for each axis. These were derived from line 4493 in the ARCS
+	// source file under the variable "commandCalc".
 	alphabetForCommands := []string{"A", "B", "C", "D", "E", "F", "T"}
 	jmotors := []int{j1stepLim, j2stepLim, j3stepLim, j4stepLim, j5stepLim, j6stepLim, 0}
+	calibDirs := []bool{j1calibdir, j2calibdir, j3calibdir,
+		j4calibdir, j5calibdir, j6calibdir, trcalibdir}
+	directions := []bool{ar3.j1dir, ar3.j2dir, ar3.j3dir,
+		ar3.j4dir, ar3.j5dir, ar3.j6dir, ar3.trdir}
 	homeMotor := []bool{j1, j2, j3, j4, j5, j6, tr}
-	for i, direction := range []bool{ar3.j1dir, ar3.j2dir, ar3.j3dir, ar3.j4dir, ar3.j5dir, ar3.j6dir, ar3.trdir} {
-		// First, we check if we need to home the motor. If we do not (false), do not home the motor.
+	for i := range directions {
+		// First, we check if we need to home the motor. If we do not (false),
+		// do not home the motor.
 		if homeMotor[i] {
-			// Each direction is set by the boolean and appended into the calibrate string.
-			// The number of steps taken is equivalent to the step limits, which are hardcoded into the AR3 arm.
-			if direction {
+			// Each direction is set by the boolean and appended into the
+			// calibrate string. The number of steps taken is equivalent to the
+			// step limits, which are hardcoded into the AR3 arm.
+			dirBit := !(directions[i] != calibDirs[i])
+			if dirBit {
 				command = command + fmt.Sprintf("%s%d%d", alphabetForCommands[i], 0, jmotors[i])
 			} else {
 				command = command + fmt.Sprintf("%s%d%d", alphabetForCommands[i], 1, jmotors[i])
