@@ -63,14 +63,6 @@ type AR3 interface {
 	GetDirections() (bool, bool, bool, bool, bool, bool, bool)
 }
 
-// Theta Directions
-// Joint 0: -1
-// Joint 1: 1
-// Joint 2: -1
-// Joint 3: -1
-// Joint 4: 1
-// Joint 5: -1
-
 // The following StepLims are hard-coded in the ARbot.cal file for the stepper
 // motors. These should not change.
 var j1stepLim int = 15200
@@ -93,21 +85,10 @@ var trMmStep float64 = 0.0 // This is for a linear rail (mm/step)
 // AR3exec struct represents an AR3 robotic arm connected to a serial port.
 type AR3exec struct {
 	serial *os.File
-	j1     int
-	j2     int
-	j3     int
-	j4     int
-	j5     int
-	j6     int
-	tr     int
 
-	j1dir bool
-	j2dir bool
-	j3dir bool
-	j4dir bool
-	j5dir bool
-	j6dir bool
-	trdir bool
+	jointVals [7]int
+	calibDirs [7]bool
+	jointDirs [7]bool
 }
 
 // Read values off serial into a buffer
@@ -139,8 +120,11 @@ func (ar3 *AR3exec) ClearBuffer() error {
 }
 
 // Connect connects to the AR3 over serial.
-func Connect(serialConnectionStr string, j1dir, j2dir, j3dir,
-	j4dir, j5dir, j6dir, trdir bool) (*AR3exec, error) {
+func Connect(serialConnectionStr string,
+	j1dir, j2dir, j3dir, j4dir, j5dir, j6dir, trdir,
+	j1calibdir, j2calibdir, j3calibdir, j4calibdir, j5calibdir, j6calibdir,
+	trcalibdir bool) (*AR3exec, error) {
+
 	// Set up connection to the serial port
 	f, err := os.OpenFile(serialConnectionStr, unix.O_RDWR|unix.O_NOCTTY|unix.O_NONBLOCK, 0666)
 	if err != nil {
@@ -175,10 +159,12 @@ func Connect(serialConnectionStr string, j1dir, j2dir, j3dir,
 	}
 	time.Sleep(time.Millisecond * 1000)
 
+	newCalibDirs := [7]bool{j1calibdir, j2calibdir, j3calibdir, j4calibdir, j5calibdir, j6calibdir,
+		trcalibdir}
+	newJointDirs := [7]bool{j1dir, j2dir, j3dir, j4dir, j5dir, j6dir, trdir}
 	// Instantiate a new AR3 object that holds our serial port. Additionally,
 	// set default stepLims, which are hard-coded in the AR3 software
-	newAR3 := AR3exec{serial: f, j1dir: j1dir, j2dir: j2dir, j3dir: j3dir,
-		j4dir: j4dir, j5dir: j5dir, j6dir: j6dir, trdir: trdir}
+	newAR3 := AR3exec{serial: f, jointDirs: newJointDirs, calibDirs: newCalibDirs}
 
 	err = newAR3.ClearBuffer()
 	if err != nil {
@@ -251,26 +237,30 @@ func (ar3 *AR3exec) MoveSteppersRelative(speed, accdur, accspd, dccdur, dccspd,
 	j1, j2, j3, j4, j5, j6, tr int) error {
 	// First, check if the move can be made
 	to := []int{j1, j2, j3, j4, j5, j6}
-	from := []int{ar3.j1, ar3.j2, ar3.j3, ar3.j4, ar3.j5, ar3.j6}
+	from := []int{ar3.jointVals[0], ar3.jointVals[1], ar3.jointVals[2],
+		ar3.jointVals[3], ar3.jointVals[4], ar3.jointVals[5]}
+
 	limits := []int{j1stepLim, j2stepLim, j3stepLim,
 		j4stepLim, j5stepLim, j6stepLim}
+
 	motor := []string{"J1", "J2", "J3", "J4", "J5", "J6"}
-	var newPositions []int
+	var newPositions [7]int
 	for i := 0; i < 6; i++ {
 		newJ := to[i] + from[i]
-		if newJ < 0 || newJ > limits[i] {
-			return fmt.Errorf("%s out of range. Must be between 0 and %d."+
-				" Got %d", motor[i], limits[i], newJ)
+		lowerLimit := 0
+		upperLimit := limits[i]
+		if !ar3.calibDirs[i] {
+			lowerLimit = -upperLimit
+			upperLimit = 0
 		}
-		newPositions = append(newPositions, newJ)
+		if newJ < lowerLimit || newJ > upperLimit {
+			return fmt.Errorf("%s out of range. Must be between %d and %d."+
+				" Got %d", motor[i], lowerLimit, upperLimit, newJ)
+		}
+		newPositions[i] = newJ
 	}
 	// If all the limits check out, apply them.
-	ar3.j1 = newPositions[0]
-	ar3.j2 = newPositions[1]
-	ar3.j3 = newPositions[2]
-	ar3.j4 = newPositions[3]
-	ar3.j5 = newPositions[4]
-	ar3.j6 = newPositions[5]
+	ar3.jointVals = newPositions
 
 	// command string for movement is MJ
 	command := "MJ"
@@ -284,8 +274,6 @@ func (ar3 *AR3exec) MoveSteppersRelative(speed, accdur, accspd, dccdur, dccspd,
 	alphabetForCommands := []string{"A", "B", "C", "D", "E", "F", "T"}
 
 	// directions need to be set as well
-	directions := []bool{ar3.j1dir, ar3.j2dir, ar3.j3dir, ar3.j4dir,
-		ar3.j5dir, ar3.j6dir, ar3.trdir}
 	for i, j := range []int{j1, j2, j3, j4, j5, j6, tr} {
 		jdirection = 0
 
@@ -296,7 +284,7 @@ func (ar3 *AR3exec) MoveSteppersRelative(speed, accdur, accspd, dccdur, dccspd,
 
 		// We also have to compensate for the direction coded when initializing
 		// the AR3 (as oftentimes, this can be off)
-		if directions[i] {
+		if ar3.jointDirs[i] {
 			tempDir := 0
 			switch jdirection {
 			case 1:
@@ -306,7 +294,6 @@ func (ar3 *AR3exec) MoveSteppersRelative(speed, accdur, accspd, dccdur, dccspd,
 			}
 			jdirection = tempDir
 		}
-
 		command = command + fmt.Sprintf("%s%d%d", alphabetForCommands[i], jdirection, j)
 	}
 
@@ -339,9 +326,10 @@ func (ar3 *AR3exec) MoveSteppersRelative(speed, accdur, accspd, dccdur, dccspd,
 // MoveSteppersRelative for full documentation of arguments.
 func (ar3 *AR3exec) MoveSteppersAbsolute(speed, accdur, accspd, dccdur, dccspd,
 	j1, j2, j3, j4, j5, j6, tr int) error {
+	js := ar3.jointVals
 	return ar3.MoveSteppersRelative(speed, accdur, accspd, dccdur, dccspd,
-		j1-ar3.j1, j2-ar3.j2, j3-ar3.j3, j4-ar3.j4, j5-ar3.j5, j6-ar3.j6,
-		tr-ar3.tr)
+		j1-js[0], j2-js[1], j3-js[2], j4-js[3], j5-js[4], j6-js[5],
+		tr-js[6])
 }
 
 // MoveJointsAbsolute moves each of the AR3's joints to an absolute angle
@@ -377,9 +365,7 @@ func (ar3 *AR3exec) MoveJointsAbsolute(speed, accdur, accspd, dccdur,
 // the j1 -> j6 booleans "true" if that joint should be homed. Set the
 // j1calibdir -> j6calibdir booleans "true" if the calibration direction should
 // be in the negative axis direction.
-func (ar3 *AR3exec) Calibrate(speed int, j1, j2, j3, j4, j5, j6, tr,
-	j1calibdir, j2calibdir, j3calibdir, j4calibdir, j5calibdir, j6calibdir,
-	trcalibdir bool) error {
+func (ar3 *AR3exec) Calibrate(speed int, j1, j2, j3, j4, j5, j6, tr bool) error {
 	// command string for home is LL
 	command := "LL"
 
@@ -388,24 +374,22 @@ func (ar3 *AR3exec) Calibrate(speed int, j1, j2, j3, j4, j5, j6, tr,
 	// source file under the variable "commandCalc".
 	alphabetForCommands := []string{"A", "B", "C", "D", "E", "F", "T"}
 	jmotors := []int{j1stepLim, j2stepLim, j3stepLim, j4stepLim, j5stepLim, j6stepLim, 0}
-	calibDirs := []bool{j1calibdir, j2calibdir, j3calibdir,
-		j4calibdir, j5calibdir, j6calibdir, trcalibdir}
-	directions := []bool{ar3.j1dir, ar3.j2dir, ar3.j3dir,
-		ar3.j4dir, ar3.j5dir, ar3.j6dir, ar3.trdir}
+
 	homeMotor := []bool{j1, j2, j3, j4, j5, j6, tr}
-	for i := range directions {
+	for i := range ar3.jointDirs {
 		// First, we check if we need to home the motor. If we do not (false),
 		// do not home the motor.
 		if homeMotor[i] {
 			// Each direction is set by the boolean and appended into the
 			// calibrate string. The number of steps taken is equivalent to the
 			// step limits, which are hardcoded into the AR3 arm.
-			dirBit := !(directions[i] != calibDirs[i])
+			dirBit := !(ar3.jointDirs[i] != ar3.calibDirs[i])
 			if dirBit {
 				command = command + fmt.Sprintf("%s%d%d", alphabetForCommands[i], 0, jmotors[i])
 			} else {
 				command = command + fmt.Sprintf("%s%d%d", alphabetForCommands[i], 1, jmotors[i])
 			}
+
 		} else {
 			command = command + fmt.Sprintf("%s%d%d", alphabetForCommands[i], 0, 0)
 		}
@@ -433,21 +417,17 @@ func (ar3 *AR3exec) Calibrate(speed int, j1, j2, j3, j4, j5, j6, tr,
 // CurrentStepperPosition returns the current position of the AR3 arm as stepper
 // motor steps from 0 for each axis.
 func (ar3 *AR3exec) CurrentStepperPosition() (int, int, int, int, int, int, int) {
-	return ar3.j1, ar3.j2, ar3.j3, ar3.j4, ar3.j5, ar3.j6, ar3.tr
+	vals := ar3.jointVals
+	return vals[0], vals[1], vals[2], vals[3], vals[4], vals[5], vals[6]
 }
 
 // SetDirections sets the directions of the AR3 arm.
 func (ar3 *AR3exec) SetDirections(j1dir, j2dir, j3dir, j4dir, j5dir, j6dir, trdir bool) {
-	ar3.j1dir = j1dir
-	ar3.j2dir = j2dir
-	ar3.j3dir = j3dir
-	ar3.j4dir = j4dir
-	ar3.j5dir = j5dir
-	ar3.j6dir = j6dir
-	ar3.trdir = trdir
+	ar3.jointDirs = [7]bool{j1dir, j2dir, j3dir, j4dir, j5dir, j6dir, trdir}
 }
 
 // GetDirections gets the directions of the AR3 arm.
 func (ar3 *AR3exec) GetDirections() (bool, bool, bool, bool, bool, bool, bool) {
-	return ar3.j1dir, ar3.j2dir, ar3.j3dir, ar3.j4dir, ar3.j5dir, ar3.j6dir, ar3.trdir
+	dirs := ar3.jointDirs
+	return dirs[0], dirs[1], dirs[2], dirs[3], dirs[4], dirs[5], dirs[6]
 }
