@@ -86,9 +86,10 @@ var trMmStep float64 = 0.0 // This is for a linear rail (mm/step)
 type AR3exec struct {
 	serial *os.File
 
-	jointVals [7]int
-	calibDirs [7]bool
-	jointDirs [7]bool
+	jointVals        [7]int
+	calibDirs        [7]bool
+	jointDirs        [7]bool
+	limitSwitchSteps [7]int
 }
 
 // Read values off serial into a buffer
@@ -120,10 +121,21 @@ func (ar3 *AR3exec) ClearBuffer() error {
 }
 
 // Connect connects to the AR3 over serial.
-func Connect(serialConnectionStr string,
-	j1dir, j2dir, j3dir, j4dir, j5dir, j6dir, trdir,
-	j1calibdir, j2calibdir, j3calibdir, j4calibdir, j5calibdir, j6calibdir,
-	trcalibdir bool) (*AR3exec, error) {
+//
+// jointDirs is a boolean array describing which direction (positive or
+// negative) a positive step number should move each joint.
+//
+// calibDirs is a boolean array saying which side of the joint the limit switch
+// for calibration is on (if true, then the limit switch is in the negative
+// direction, after jointDirs has been applied).
+//
+// limitSwitchSteps is an array of integers representing the number of steps
+// the limit switch is offset from zero. Each value should be directional, i.e.
+// the value should be the directional number of steps to move the joint from
+// the limit switch to the 0 position.
+func Connect(serialConnectionStr string, jointDirs [7]bool, calibDirs [7]bool,
+	limitSwitchSteps [7]int) (
+	*AR3exec, error) {
 
 	// Set up connection to the serial port
 	f, err := os.OpenFile(serialConnectionStr, unix.O_RDWR|unix.O_NOCTTY|unix.O_NONBLOCK, 0666)
@@ -159,12 +171,10 @@ func Connect(serialConnectionStr string,
 	}
 	time.Sleep(time.Millisecond * 1000)
 
-	newCalibDirs := [7]bool{j1calibdir, j2calibdir, j3calibdir, j4calibdir, j5calibdir, j6calibdir,
-		trcalibdir}
-	newJointDirs := [7]bool{j1dir, j2dir, j3dir, j4dir, j5dir, j6dir, trdir}
 	// Instantiate a new AR3 object that holds our serial port. Additionally,
 	// set default stepLims, which are hard-coded in the AR3 software
-	newAR3 := AR3exec{serial: f, jointDirs: newJointDirs, calibDirs: newCalibDirs}
+	newAR3 := AR3exec{serial: f, jointDirs: jointDirs, calibDirs: calibDirs,
+		limitSwitchSteps: limitSwitchSteps}
 
 	err = newAR3.ClearBuffer()
 	if err != nil {
@@ -327,9 +337,10 @@ func (ar3 *AR3exec) MoveSteppersRelative(speed, accdur, accspd, dccdur, dccspd,
 func (ar3 *AR3exec) MoveSteppersAbsolute(speed, accdur, accspd, dccdur, dccspd,
 	j1, j2, j3, j4, j5, j6, tr int) error {
 	js := ar3.jointVals
+	sl := ar3.limitSwitchSteps
 	return ar3.MoveSteppersRelative(speed, accdur, accspd, dccdur, dccspd,
-		j1-js[0], j2-js[1], j3-js[2], j4-js[3], j5-js[4], j6-js[5],
-		tr-js[6])
+		j1-js[0]+sl[0], j2-js[1]+sl[1], j3-js[2]+sl[2], j4-js[3]+sl[3],
+		j5-js[4]+sl[4], j6-js[5]+sl[5], tr-js[6]+sl[6])
 }
 
 // MoveJointsAbsolute moves each of the AR3's joints to an absolute angle
@@ -419,6 +430,25 @@ func (ar3 *AR3exec) Calibrate(speed int, j1, j2, j3, j4, j5, j6, tr bool) error 
 func (ar3 *AR3exec) CurrentStepperPosition() (int, int, int, int, int, int, int) {
 	vals := ar3.jointVals
 	return vals[0], vals[1], vals[2], vals[3], vals[4], vals[5], vals[6]
+}
+
+// AnglesToSteps converts joint angles to number of stepper steps
+func AnglesToSteps(angles [7]float64, deg bool) [7]int {
+	var conv float64
+	if deg {
+		conv = DEG
+	} else {
+		conv = 1
+	}
+	jointSteps := [7]int{
+		int(math.Round(conv * angles[0] / j1RadStep)),
+		int(math.Round(conv * angles[1] / j2RadStep)),
+		int(math.Round(conv * angles[2] / j3RadStep)),
+		int(math.Round(conv * angles[3] / j4RadStep)),
+		int(math.Round(conv * angles[4] / j5RadStep)),
+		int(math.Round(conv * angles[5] / j6RadStep)),
+		int(math.Round(conv * angles[6] / trMmStep))}
+	return jointSteps
 }
 
 // SetDirections sets the directions of the AR3 arm.
