@@ -5,9 +5,19 @@ import (
 	"testing"
 )
 
+// TestMockArmInterface checks that the AR3simulate struct implements the Arm
+// interface
+func TestMockArmInterface(t *testing.T) {
+	val := AR3simulate{}
+	_, ok := interface{}(&val).(Arm)
+	if !ok {
+		t.Errorf("Failed")
+	}
+}
+
 func TestAR3simulate_MoveSteppers(t *testing.T) {
 	// The following line establishes that mock DOES implement the AR3 interface.
-	var arm AR3 //nolint
+	var arm Arm //nolint
 	arm = ConnectMock()
 	err := arm.MoveSteppers(25, 15, 10, 20, 5, 500, 500, 500, 500, 500, 500000000, 0)
 	if err == nil {
