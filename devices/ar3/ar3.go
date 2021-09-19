@@ -144,7 +144,6 @@ func (ar3 *AR3exec) ClearBuffer() error {
 // the value should be the directional number of steps to move the joint from
 // the limit switch to the 0 position.
 func Connect(serialConnectionStr string, jointDirs [7]bool, calibDirs [7]bool, limitSwitchSteps [7]int) (*AR3exec, error) {
-
 	// Set up connection to the serial port
 	f, err := os.OpenFile(serialConnectionStr, unix.O_RDWR|unix.O_NOCTTY|unix.O_NONBLOCK, 0666)
 	if err != nil {
@@ -330,7 +329,10 @@ func (ar3 *AR3exec) MoveSteppersRelative(speed, accdur, accspd, dccdur, dccspd, 
 	}
 
 	// This has to send and get a response to indicate the move is complete
-	ar3.Echo()
+	err = ar3.Echo()
+	if err != nil {
+		return err
+	}
 
 	// Normally, we would check here for successful completion. However, there
 	// IS no way to check for successful completion implemented in the AR3 code.
@@ -353,7 +355,6 @@ func (ar3 *AR3exec) MoveSteppersAbsolute(speed, accdur, accspd, dccdur, dccspd, 
 // defined relative to the calibration position for each joint. Angles are
 // definied in radians, unless deg is true (in which angles are degrees).
 func (ar3 *AR3exec) MoveJointsAbsolute(speed, accdur, accspd, dccdur, dccspd int, j1, j2, j3, j4, j5, j6, tr float64, deg bool) error {
-
 	jointSteps := AnglesToSteps([7]float64{j1, j2, j3, j4, j5, j6, tr}, deg)
 
 	return ar3.MoveSteppersAbsolute(speed, accdur, accspd, dccdur, dccspd,
@@ -403,7 +404,6 @@ func (ar3 *AR3exec) Calibrate(speed int, j1, j2, j3, j4, j5, j6, tr bool) error 
 			} else {
 				command = command + fmt.Sprintf("%s%d%d", alphabetForCommands[i], 1, jmotors[i])
 			}
-
 		} else {
 			command = command + fmt.Sprintf("%s%d%d", alphabetForCommands[i], 0, 0)
 		}

@@ -15,7 +15,10 @@ func main() {
 		fmt.Printf("%s\n", err)
 	}
 
-	robot.Calibrate(25, true, true, true, true, true, true, false)
+	err = robot.Calibrate(25, true, true, true, true, true, true, false)
+	if err != nil {
+		fmt.Printf("%s\n", err)
+	}
 
 	err = robot.MoveJointsAbsolute(5, 10, 10, 10, 10, 0, 0, 0, 0, 0, 0, 0, true)
 	if err != nil {
