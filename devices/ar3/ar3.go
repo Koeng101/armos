@@ -65,32 +65,39 @@ var AR3DhParameters kinematics.DhParameters = kinematics.DhParameters{
 
 // Arm is the generic interface for interacting with an AR3 robotic arm.
 type Arm interface {
-	CurrentPosition() (int, int, int, int, int, int, int)
-	Echo() error
 	Calibrate(speed int, j1, j2, j3, j4, j5, j6, tr bool) error
-	MoveSteppers(speed, accdur, accspd, dccdur, dccspd, j1, j2, j3, j4, j5, j6, tr int) error
-	SetDirections(bool, bool, bool, bool, bool, bool, bool)
+	Echo() error
 	GetDirections() (bool, bool, bool, bool, bool, bool, bool)
+	SetDirections(bool, bool, bool, bool, bool, bool, bool)
+
+	// Current Positions
+	CurrentJointRadians() [7]float64
+	CurrentPose() kinematics.Pose
+	CurrentStepperPosition() [7]int
+
+	MoveSteppers(speed, accdur, accspd, dccdur, dccspd, j1, j2, j3, j4, j5, j6, tr int) error
+	MoveJointRadians(speed, accdur, accspd, dccdur, dccspd int, j1, j2, j3, j4, j5, j6, tr float64) error
+	Move(speed, accdur, accspd, dccdur, dccspd int, pose kinematics.Pose) error
 }
 
 // The following StepLims are hard-coded in the ARbot.cal file for the stepper
 // motors. These should not change.
-var j1stepLim int = 15200
-var j2stepLim int = 7300
-var j3stepLim int = 7850
-var j4stepLim int = 15200
-var j5stepLim int = 4575
-var j6stepLim int = 6625
+const j1stepLim int = 15200
+const j2stepLim int = 7300
+const j3stepLim int = 7850
+const j4stepLim int = 15200
+const j5stepLim int = 4575
+const j6stepLim int = 6625
 
 // The following RadSteps (radians per step) are calculated from the AR3 stepper
 // motors and gearing to be exact values for converting steps to joint angles
-var j1RadStep float64 = 0.0225 * degreesToRadians
-var j2RadStep float64 = 0.018 * degreesToRadians
-var j3RadStep float64 = 0.018 * degreesToRadians
-var j4RadStep float64 = 0.01092214664 * degreesToRadians
-var j5RadStep float64 = 0.04723477289 * degreesToRadians
-var j6RadStep float64 = 0.02343358396 * degreesToRadians
-var trMmStep float64 = 0.0 // This is for a linear rail (mm/step)
+const j1RadStep float64 = 0.0225 * degreesToRadians
+const j2RadStep float64 = 0.018 * degreesToRadians
+const j3RadStep float64 = 0.018 * degreesToRadians
+const j4RadStep float64 = 0.01092214664 * degreesToRadians
+const j5RadStep float64 = 0.04723477289 * degreesToRadians
+const j6RadStep float64 = 0.02343358396 * degreesToRadians
+const trMmStep float64 = 0.0 // This is for a linear rail (mm/step)
 
 // AR3exec struct represents an AR3 robotic arm connected to a serial port.
 type AR3exec struct {
@@ -102,8 +109,8 @@ type AR3exec struct {
 	limitSwitchSteps [7]int
 }
 
-// ReadBuffer values off serial into a buffer
-func (ar3 *AR3exec) ReadBuffer() error {
+// readBuffer values off serial into a buffer
+func (ar3 *AR3exec) readBuffer() error {
 	// Read output of echo
 	buf := make([]byte, 128)
 	_, err := ar3.serial.Read(buf)
@@ -113,9 +120,9 @@ func (ar3 *AR3exec) ReadBuffer() error {
 	return nil
 }
 
-// ClearBuffer Discards data written to the port but not transmitted, or data
+// clearBuffer Discards data written to the port but not transmitted, or data
 // received but not read.
-func (ar3 *AR3exec) ClearBuffer() error {
+func (ar3 *AR3exec) clearBuffer() error {
 	const TCFLSH = 0x540B
 	_, _, errno := unix.Syscall(
 		unix.SYS_IOCTL,
@@ -184,7 +191,7 @@ func Connect(serialConnectionStr string, jointDirs [7]bool, calibDirs [7]bool, l
 	newAR3 := AR3exec{serial: f, jointDirs: jointDirs, calibDirs: calibDirs,
 		limitSwitchSteps: limitSwitchSteps}
 
-	err = newAR3.ClearBuffer()
+	err = newAR3.clearBuffer()
 	if err != nil {
 		return &newAR3, err
 	}
@@ -234,7 +241,7 @@ func (ar3 *AR3exec) Echo() error {
 	return nil
 }
 
-// MoveSteppersRelative moves each of the AR3's stepper motors by a certain
+// moveSteppersRelative moves each of the AR3's stepper motors by a certain
 // amount of steps. In addition to the j1,j2,j3,j4,j5,j6 positions, you can also
 // define 5 other variables: ACCdur, ACCspd, DCCdur, and DCCspd (these are named
 // DEC on ARCS but DCC on the arduino controller), which define the acceleration
@@ -249,9 +256,9 @@ func (ar3 *AR3exec) Echo() error {
 // the AR3 arm on a track, but it would appear that has not been implemented.
 // Unless you know what you're doing, please keep this variable at 0.
 //
-// MoveSteppersRelative does not have ANY checks. Please double check the values
-// getting fed to MoveSteppersRelative or else the robot WILL self destruct.
-func (ar3 *AR3exec) MoveSteppersRelative(speed, accdur, accspd, dccdur, dccspd, j1, j2, j3, j4, j5, j6, tr int) error {
+// moveSteppersRelative does not have ANY checks. Please double check the values
+// getting fed to moveSteppersRelative or else the robot WILL self destruct.
+func (ar3 *AR3exec) moveSteppersRelative(speed, accdur, accspd, dccdur, dccspd, j1, j2, j3, j4, j5, j6, tr int) error {
 	// First, check if the move can be made
 	to := []int{j1, j2, j3, j4, j5, j6}
 	from := []int{ar3.jointVals[0], ar3.jointVals[1], ar3.jointVals[2],
@@ -324,7 +331,7 @@ func (ar3 *AR3exec) MoveSteppersRelative(speed, accdur, accspd, dccdur, dccspd, 
 		return err
 	}
 
-	err = ar3.ReadBuffer()
+	err = ar3.readBuffer()
 	if err != nil {
 		return err
 	}
@@ -338,40 +345,40 @@ func (ar3 *AR3exec) MoveSteppersRelative(speed, accdur, accspd, dccdur, dccspd, 
 	return nil
 }
 
-// MoveSteppersAbsolute moves each of the AR3's stepper motors to an absolute
+// MoveSteppers moves each of the AR3's stepper motors to an absolute
 // step position between 0 and the step limit for each joint. See
-// MoveSteppersRelative for full documentation of arguments.
-func (ar3 *AR3exec) MoveSteppersAbsolute(speed, accdur, accspd, dccdur, dccspd, j1, j2, j3, j4, j5, j6, tr int) error {
+// moveSteppersRelative for full documentation of arguments.
+func (ar3 *AR3exec) MoveSteppers(speed, accdur, accspd, dccdur, dccspd, j1, j2, j3, j4, j5, j6, tr int) error {
 	js := ar3.jointVals
 	sl := ar3.limitSwitchSteps
-	return ar3.MoveSteppersRelative(speed, accdur, accspd, dccdur, dccspd,
+	return ar3.moveSteppersRelative(speed, accdur, accspd, dccdur, dccspd,
 		j1-js[0]+sl[0], j2-js[1]+sl[1], j3-js[2]+sl[2], j4-js[3]+sl[3],
 		j5-js[4]+sl[4], j6-js[5]+sl[5], tr-js[6]+sl[6])
 }
 
-// MoveJointsAbsolute moves each of the AR3's joints to an absolute angle
+// MoveJointRadians moves each of the AR3's joints to an absolute angle
 // defined relative to the calibration position for each joint. Angles are
-// definied in radians, unless deg is true (in which angles are degrees).
-func (ar3 *AR3exec) MoveJointsAbsolute(speed, accdur, accspd, dccdur, dccspd int, j1, j2, j3, j4, j5, j6, tr float64, deg bool) error {
+// defined as radians here.
+func (ar3 *AR3exec) MoveJointRadians(speed, accdur, accspd, dccdur, dccspd int, j1, j2, j3, j4, j5, j6, tr float64) error {
 
-	jointSteps := AnglesToSteps([7]float64{j1, j2, j3, j4, j5, j6, tr}, deg)
+	jointSteps := anglesToSteps([7]float64{j1, j2, j3, j4, j5, j6, tr}, false)
 
-	return ar3.MoveSteppersAbsolute(speed, accdur, accspd, dccdur, dccspd,
+	return ar3.MoveSteppers(speed, accdur, accspd, dccdur, dccspd,
 		jointSteps[0], jointSteps[1], jointSteps[2], jointSteps[3],
 		jointSteps[4], jointSteps[5], jointSteps[6])
 }
 
 // Move to a new end effector Pose using inverse kinematics to solve for the
 // joint angles.
-func (ar3 *AR3exec) MovePose(speed, accdur, accspd, dccdur, dccspd int, pose kinematics.Pose) error {
-	ja := ar3.CurrentJointAngles(false)
+func (ar3 *AR3exec) Move(speed, accdur, accspd, dccdur, dccspd int, pose kinematics.Pose) error {
+	ja := ar3.CurrentJointRadians()
 	thetasInit := kinematics.JointAngles{J1: ja[0], J2: ja[1], J3: ja[2], J4: ja[3], J5: ja[4], J6: ja[5]}
 	tj, err := kinematics.InverseKinematics(pose, AR3DhParameters, thetasInit)
 	if err != nil {
 		fmt.Printf("Inverse Kinematics failed with error: %s", err)
 	}
-	return ar3.MoveJointsAbsolute(speed, accdur, accspd, dccdur,
-		dccspd, tj.J1, tj.J2, tj.J3, tj.J4, tj.J5, tj.J6, 0, false)
+	return ar3.MoveJointRadians(speed, accdur, accspd, dccdur,
+		dccspd, tj.J1, tj.J2, tj.J3, tj.J4, tj.J5, tj.J6, 0)
 }
 
 // Calibrate moves each of the AR3's stepper motors to their respective limit
@@ -418,7 +425,7 @@ func (ar3 *AR3exec) Calibrate(speed int, j1, j2, j3, j4, j5, j6, tr bool) error 
 		return err
 	}
 
-	err = ar3.ReadBuffer()
+	err = ar3.readBuffer()
 	if err != nil {
 		return err
 	}
@@ -435,30 +442,29 @@ func (ar3 *AR3exec) CurrentStepperPosition() [7]int {
 	return vals
 }
 
-// CurrentJointAngles returns the current joint angles from the zero joint value
+// CurrentJointRadians returns the current joint angles from the zero joint value
 // This is different than CurrentStepperPositions which returns values from the
 // limit switch zeroed positions, as these values are offset by the
 // limitSwitchSteps array.
-func (ar3 *AR3exec) CurrentJointAngles(deg bool) [7]float64 {
+func (ar3 *AR3exec) CurrentJointRadians() [7]float64 {
 	js := ar3.jointVals
 	sl := ar3.limitSwitchSteps
-	stepVals := [7]int{js[0] - sl[0], js[1] - sl[1], js[2] - sl[2],
-		js[3] - sl[3], js[4] - sl[4], js[5] - sl[5], js[6] - sl[6]}
-	jointVals := StepsToAngles(stepVals, deg)
+	stepVals := [7]int{js[0] - sl[0], js[1] - sl[1], js[2] - sl[2], js[3] - sl[3], js[4] - sl[4], js[5] - sl[5], js[6] - sl[6]}
+	jointVals := stepsToAngles(stepVals, false)
 	return jointVals
 }
 
 // CurrentPose returns the current Pose of the robot, using forward kinematics
 // on the DH parameters and current joint angles.
 func (ar3 *AR3exec) CurrentPose() kinematics.Pose {
-	ja := ar3.CurrentJointAngles(false)
+	ja := ar3.CurrentJointRadians()
 	thetasInit := kinematics.JointAngles{J1: ja[0], J2: ja[1], J3: ja[2], J4: ja[3], J5: ja[4], J6: ja[5]}
 	return kinematics.ForwardKinematics(thetasInit, AR3DhParameters)
 }
 
-// Convert number of steps into angles using the steps to angle conversion for
-// each joint.
-func StepsToAngles(steps [7]int, deg bool) [7]float64 {
+// stepsToAngles converts number of steps into angles using the steps to angle
+// conversion for each joint.
+func stepsToAngles(steps [7]int, deg bool) [7]float64 {
 	var conv float64
 	if deg {
 		conv = degreesToRadians
@@ -476,8 +482,8 @@ func StepsToAngles(steps [7]int, deg bool) [7]float64 {
 	return jointAngles
 }
 
-// AnglesToSteps converts joint angles to number of stepper steps
-func AnglesToSteps(angles [7]float64, deg bool) [7]int {
+// anglesToSteps converts joint angles to number of stepper steps
+func anglesToSteps(angles [7]float64, deg bool) [7]int {
 	var conv float64
 	if deg {
 		conv = degreesToRadians
