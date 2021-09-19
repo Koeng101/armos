@@ -46,11 +46,22 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/koeng101/kinematics"
 	"golang.org/x/sys/unix"
 )
 
 // Converts degrees to radians
 var DEG float64 = math.Pi / 180
+
+// Denavit-Hartenberg Parameters of AR3 provided by AR2 Version 2.0 software
+// executable files from https://www.anninrobotics.com/downloads
+// Those parameters are the same between the AR2 and AR3.
+var AR3DhParameters kinematics.DhParameters = kinematics.DhParameters{
+	ThetaOffsets: [...]float64{0, -math.Pi / 2, 0, 0, 0, math.Pi},
+	AlphaValues:  [...]float64{-(math.Pi / 2), 0, math.Pi / 2, -(math.Pi / 2), math.Pi / 2, 0},
+	AValues:      [...]float64{64.2, 305, 0, 0, 0, 0},
+	DValues:      [...]float64{169.77, 0, 0, -222.63, 0, -36.25},
+}
 
 // AR3 is the generic interface for interacting with an AR3 robotic arm.
 type AR3 interface {
@@ -349,26 +360,25 @@ func (ar3 *AR3exec) MoveSteppersAbsolute(speed, accdur, accspd, dccdur, dccspd,
 func (ar3 *AR3exec) MoveJointsAbsolute(speed, accdur, accspd, dccdur,
 	dccspd int, j1, j2, j3, j4, j5, j6, tr float64, deg bool) error {
 
-	var conv float64
-
-	if deg {
-		conv = DEG
-	} else {
-		conv = 1
-	}
-
-	jointSteps := []int{
-		int(math.Round(conv * j1 / j1RadStep)),
-		int(math.Round(conv * j2 / j2RadStep)),
-		int(math.Round(conv * j3 / j3RadStep)),
-		int(math.Round(conv * j4 / j4RadStep)),
-		int(math.Round(conv * j5 / j5RadStep)),
-		int(math.Round(conv * j6 / j6RadStep)),
-		int(math.Round(conv * tr / trMmStep))}
+	jointSteps := AnglesToSteps([7]float64{j1, j2, j3, j4, j5, j6, tr}, deg)
 
 	return ar3.MoveSteppersAbsolute(speed, accdur, accspd, dccdur, dccspd,
 		jointSteps[0], jointSteps[1], jointSteps[2], jointSteps[3],
 		jointSteps[4], jointSteps[5], jointSteps[6])
+}
+
+// Move to a new end effector Pose using inverse kinematics to solve for the
+// joint angles.
+func (ar3 *AR3exec) MovePose(speed, accdur, accspd, dccdur,
+	dccspd int, pose kinematics.Pose) error {
+	ja := ar3.CurrentJointAngles(false)
+	thetasInit := kinematics.JointAngles{J1: ja[0], J2: ja[1], J3: ja[2], J4: ja[3], J5: ja[4], J6: ja[5]}
+	tj, err := kinematics.InverseKinematics(pose, AR3DhParameters, thetasInit)
+	if err != nil {
+		fmt.Printf("Inverse Kinematics failed with error: %s", err)
+	}
+	return ar3.MoveJointsAbsolute(speed, accdur, accspd, dccdur,
+		dccspd, tj.J1, tj.J2, tj.J3, tj.J4, tj.J5, tj.J6, 0, false)
 }
 
 // Calibrate moves each of the AR3's stepper motors to their respective limit
@@ -426,10 +436,51 @@ func (ar3 *AR3exec) Calibrate(speed int, j1, j2, j3, j4, j5, j6, tr bool) error 
 }
 
 // CurrentStepperPosition returns the current position of the AR3 arm as stepper
-// motor steps from 0 for each axis.
-func (ar3 *AR3exec) CurrentStepperPosition() (int, int, int, int, int, int, int) {
+// motor steps from the zeroed value for each axis.
+func (ar3 *AR3exec) CurrentStepperPosition() [7]int {
 	vals := ar3.jointVals
-	return vals[0], vals[1], vals[2], vals[3], vals[4], vals[5], vals[6]
+	return vals
+}
+
+// CurrentJointAngles returns the current joint angles from the zero joint value
+// This is different than CurrentStepperPositions which returns values from the
+// limit switch zeroed positions, as these values are offset by the
+// limitSwitchSteps array.
+func (ar3 *AR3exec) CurrentJointAngles(deg bool) [7]float64 {
+	js := ar3.jointVals
+	sl := ar3.limitSwitchSteps
+	stepVals := [7]int{js[0] - sl[0], js[1] - sl[1], js[2] - sl[2],
+		js[3] - sl[3], js[4] - sl[4], js[5] - sl[5], js[6] - sl[6]}
+	jointVals := StepsToAngles(stepVals, deg)
+	return jointVals
+}
+
+// CurrentPose returns the current Pose of the robot, using forward kinematics
+// on the DH parameters and current joint angles.
+func (ar3 *AR3exec) CurrentPose() kinematics.Pose {
+	ja := ar3.CurrentJointAngles(false)
+	thetasInit := kinematics.JointAngles{J1: ja[0], J2: ja[1], J3: ja[2], J4: ja[3], J5: ja[4], J6: ja[5]}
+	return kinematics.ForwardKinematics(thetasInit, AR3DhParameters)
+}
+
+// Convert number of steps into angles using the steps to angle conversion for
+// each joint.
+func StepsToAngles(steps [7]int, deg bool) [7]float64 {
+	var conv float64
+	if deg {
+		conv = DEG
+	} else {
+		conv = 1
+	}
+	jointAngles := [7]float64{
+		j1RadStep * float64(steps[0]) / conv,
+		j2RadStep * float64(steps[1]) / conv,
+		j3RadStep * float64(steps[2]) / conv,
+		j4RadStep * float64(steps[3]) / conv,
+		j5RadStep * float64(steps[4]) / conv,
+		j6RadStep * float64(steps[5]) / conv,
+		trMmStep * float64(steps[6]) / conv}
+	return jointAngles
 }
 
 // AnglesToSteps converts joint angles to number of stepper steps

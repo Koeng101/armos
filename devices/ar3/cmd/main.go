@@ -6,50 +6,54 @@ import (
 	"github.com/koeng101/armos/devices/ar3"
 )
 
-// Theta Directions
-// Joint 0: -1
-// Joint 1: 1
-// Joint 2: -1
-// Joint 3: -1
-// Joint 4: 1
-// Joint 5: -1
-
 func main() {
-	robot, err := ar3.Connect("/dev/ttyUSB0", true, false, false, true, false, false, false,
-		false, true, false, false, true, false, false)
+	jointDirs := [7]bool{true, false, false, true, false, true, false}
+	calibDirs := [7]bool{false, true, false, false, true, true, false}
+	limitSwitchSteps := ar3.AnglesToSteps([7]float64{-170, 85, -60, -85, 90, 80, 0}, true)
+	robot, err := ar3.Connect("/dev/ttyUSB0", jointDirs, calibDirs, limitSwitchSteps)
 	if err != nil {
 		fmt.Printf("%s\n", err)
 	}
 
-	// robot.MoveSteppersRelative(5, 10, 10, 10, 10, 100, 100, 100, 100, 100, 100, 0)
 	robot.Calibrate(25, true, true, true, true, true, true, false)
-	// fmt.Println("Calibration Complete")
 
-	err = robot.MoveSteppersRelative(5, 10, 10, 10, 10, -1000, 1000, -1000, -2000, 1000, -1000, 0)
+	err = robot.MoveJointsAbsolute(5, 10, 10, 10, 10, 0, 0, 0, 0, 0, 0, 0, true)
 	if err != nil {
 		fmt.Printf("%s\n", err)
 	}
-	// robot.MoveSteppersRelative(5, 10, 10, 10, 10, -100, 100, 100, 100, 100, 100, 0)
+	currPose := robot.CurrentPose()
+	err = robot.MovePose(5, 10, 10, 10, 10, currPose)
+	if err != nil {
+		fmt.Printf("%s\n", err)
+	}
+	// Move down 50 mm to avoid singularities during square
+	targPose := currPose
+	targPose.Pos.Z -= 50
+	err = robot.MovePose(5, 10, 10, 10, 10, targPose)
+	if err != nil {
+		fmt.Printf("%s\n", err)
+	}
 
-	// err = robot.MoveJointsAbsolute(5, 10, 10, 10, 10, 170, 85, 60, 85, 90, 80, 0, true)
-	// fmt.Println("Move 1 Complete")
-
-	// ar3.Connect("/dev/ttyUSB0", false, false, true, false, false, true, false)
-
-	// err = robot.MoveSteppersAbsolute(5, 10, 10, 10, 10, 500, 1000, 1000, 1000, 1000, 1000, 0)
-	// fmt.Println("Move 2 Complete")
-	// if err != nil {
-	// 	fmt.Printf("%s\n", err)
-	// }
-	// robot.MoveSteppersRelative(5, 0, 10, 0, 10, -100, -200, 0, 0, 0, 0, 0)
-
-	// _ = robot.MoveSteppers(10, 15, 10, 20, 5, 100, 100, 0, 0, 0, 0, 0)
-
-	// _ = robot.MoveSteppers(10, 15, 10, 20, 5, -100, -100, 0, 0, 0, 0, 0)
-
-	// _ = robot.MoveSteppers(25,15,10,20,5,800,4500,0,0,1000,0,0)
-
-	// _ = robot.MoveSteppers(25,15,10,20,5,0,0,0,0,0,0,0)
-
-	// _ = robot.MoveSteppers(25,15,10,20,5,-800,-4500,0,0,-1000,0,0)
+	// Now make a 100 mm square
+	sideLength := 100.0
+	targPose.Pos.Z -= sideLength
+	err = robot.MovePose(5, 10, 10, 10, 10, targPose)
+	if err != nil {
+		fmt.Printf("%s\n", err)
+	}
+	targPose.Pos.Y -= sideLength
+	err = robot.MovePose(5, 10, 10, 10, 10, targPose)
+	if err != nil {
+		fmt.Printf("%s\n", err)
+	}
+	targPose.Pos.Z += sideLength
+	err = robot.MovePose(5, 10, 10, 10, 10, targPose)
+	if err != nil {
+		fmt.Printf("%s\n", err)
+	}
+	targPose.Pos.Y += sideLength
+	err = robot.MovePose(5, 10, 10, 10, 10, targPose)
+	if err != nil {
+		fmt.Printf("%s\n", err)
+	}
 }
